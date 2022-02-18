@@ -1,47 +1,56 @@
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
 using System;
+using System.IO;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Hosting;
+using ServiceStack;
+using ServiceStack.Logging;
+using ServiceStack.Logging.Serilog;
 
-namespace ATS.DarkSearch
+Log.Logger = new LoggerConfiguration()
+	.MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+	.MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+	.Enrich.FromLogContext()
+	.WriteTo.Console()
+	.WriteTo.Debug()
+	.WriteTo.File(path: "Logs/log.txt", rollingInterval: RollingInterval.Day)
+	.CreateLogger();
+
+try
 {
-	public class Program
+	Log.Information("Starting web host");
+	var builder = WebApplication.CreateBuilder(args);
+	builder.Host.UseSerilog();
+	
+	var app = builder.Build();
+	if (app.Environment.IsDevelopment())
 	{
-		public static int Main(string[] args)
-		{
-			Log.Logger = new LoggerConfiguration()
-				.MinimumLevel.Override("Microsoft", LogEventLevel.Information)
-				.MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-				.Enrich.FromLogContext()
-				.WriteTo.Console()
-				.WriteTo.Debug()
-				.WriteTo.File(path: "Logs/log.txt", rollingInterval: RollingInterval.Day)
-				.CreateLogger();
-
-			try
-			{
-				Log.Information("Starting web host");
-				CreateHostBuilder(args).Build().Run();
-				return 0;
-			}
-			catch (Exception ex)
-			{
-				Log.Fatal(ex, "Host terminated unexpectedly");
-				return 1;
-			}
-			finally
-			{
-				Log.CloseAndFlush();
-			}
-		}
-
-		public static IHostBuilder CreateHostBuilder(string[] args) =>
-			Host.CreateDefaultBuilder(args)
-				.UseSerilog()
-				.ConfigureWebHostDefaults(webBuilder =>
-				{
-					webBuilder.UseStartup<Startup>();
-				});
+		app.UseDeveloperExceptionPage();
 	}
+	else
+	{
+		app.UseExceptionHandler("/Error");
+		// The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+		app.UseHsts();
+		//app.UseHttpsRedirection();
+	}
+
+	app.UseSerilogRequestLogging();
+
+	var licensePath = "~/Data/ServiceStackLicense.txt".MapServerPath();
+	if (!File.Exists(licensePath))
+		Log.Logger.Error("License path does not exist: " + licensePath);
+
+	Licensing.RegisterLicenseFromFileIfExists(licensePath);
+	
+	app.Run();
+}
+catch (Exception ex)
+{
+	Log.Fatal(ex, "Host terminated unexpectedly");
+}
+finally
+{
+	Log.CloseAndFlush();
 }

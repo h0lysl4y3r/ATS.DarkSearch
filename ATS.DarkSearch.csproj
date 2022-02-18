@@ -17,20 +17,28 @@
     <Content Include="Data\links.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <None Remove="Data\ServiceStackLicense.txt" />
+    <Content Include="Data\ServiceStackLicense.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AngleSharp" Version="0.16.1" />
-    <PackageReference Include="ATS.Common" Version="0.1.0" />
+    <PackageReference Include="ATS.Common" Version="0.1.4" />
     <PackageReference Include="Knapcode.TorSharp" Version="2.8.1" />
     <PackageReference Include="RabbitMQ.Client" Version="6.2.3" />
     <PackageReference Include="Serilog.AspNetCore" Version="4.1.0" />
+    <PackageReference Include="ServiceStack" Version="6.0.2" />
+    <PackageReference Include="ServiceStack.Api.OpenApi.Core" Version="6.0.2" />
+    <PackageReference Include="ServiceStack.Logging.Serilog.Core" Version="1.0.44" />
     <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.1.4" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.1.4" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="6.1.4" />
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Logs" />
     <Folder Include="Reports\" />
   </ItemGroup>
 

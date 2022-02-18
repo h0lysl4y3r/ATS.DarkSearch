@@ -21,21 +21,24 @@ namespace ATS.DarkSearch.Controllers
 	[Route("/ping/")]
 	public class DarkSearchController : ControllerBase
 	{
-		protected readonly Microsoft.Extensions.Configuration.IConfiguration _config;
-		protected readonly ILogger<DarkSearchController> _logger;
-		protected readonly IDiagnosticContext _diagnosticContext;
-		protected readonly IWebHostEnvironment _hostEnvironment;
-		protected static string[] _links;
+		private readonly Microsoft.Extensions.Configuration.IConfiguration _config;
+		private readonly ILogger<DarkSearchController> _logger;
+		private readonly IDiagnosticContext _diagnosticContext;
+		private readonly IWebHostEnvironment _hostEnvironment;
+		private readonly Spider _spider;
+		private static string[] _links;
 
 		public DarkSearchController(Microsoft.Extensions.Configuration.IConfiguration config,
 			ILogger<DarkSearchController> logger,
 			IDiagnosticContext diagnosticContext,
-			IWebHostEnvironment hostEnvironment)
+			IWebHostEnvironment hostEnvironment,
+			Spider spider)
 		{
 			_logger = logger;
 			_config = config;
 			_diagnosticContext = diagnosticContext;
 			_hostEnvironment = hostEnvironment;
+			_spider = spider;
 
 			InitConfiguration();
 		}
@@ -46,114 +49,28 @@ namespace ATS.DarkSearch.Controllers
 			_links = new string[] { "http://lldan5gahapx5k7iafb3s4ikijc4ni7gx5iywdflkba5y2ezyg6sjgyd.onion" };
 		}
 
-		[HttpPost("urls")]
+		[HttpPost("tests/urls")]
 		public string[] GetUrls()
 		{
 			return _links;
 		}
 
-		[HttpPost("once")]
-		public async Task<List<PingResultPoco>> PingOnceAll()
+		[HttpPost("ping")]
+		public async Task<PingResultPoco> Ping(string link)
 		{
-			// configure
-			var settings = new TorSharpSettings
-			{
-				ZippedToolsDirectory = Path.Combine(_hostEnvironment.ContentRootPath, "Tor", "TorZipped"),
-				ExtractedToolsDirectory = Path.Combine(_hostEnvironment.ContentRootPath, "Tor", "TorExtracted"),
-				PrivoxySettings = { Port = 18118 },
-				TorSettings =
-				{
-					SocksPort = 19050,
-					AdditionalSockPorts = { 19052 },
-					ControlPort = 19051,
-					ControlPassword = "",
-				},
-			};
-
-			// download tools
+			PingResultPoco ping = null;
 			try
 			{
-				await new TorSharpToolFetcher(settings, new HttpClient()).FetchAsync();
+				await _spider.StartAsync();
+				ping = await _spider.ExecuteAsync(link);
 			}
-			catch (Exception ex)
+			catch
 			{
-				_logger.LogError(ex, ex.Message);
-				throw ex;
+				_spider.Stop();
+				throw;
 			}
 
-			var result = new List<PingResultPoco>();
-
-			// execute
-			using (var proxy = new TorSharpProxy(settings))
-			{
-				var handler = new HttpClientHandler
-				{
-					Proxy = new WebProxy(new Uri("http://localhost:" + settings.PrivoxySettings.Port))
-				};
-				var httpClient = new HttpClient(handler);
-				await proxy.ConfigureAndStartAsync();
-
-				var utcNow = DateTimeOffset.UtcNow;
-				foreach (var link in _links)
-				{
-					try
-					{
-						await proxy.GetNewIdentityAsync();
-
-						var headRequest = new HttpRequestMessage(HttpMethod.Head, link);
-						headRequest.Options.Set(new HttpRequestOptionsKey<TimeSpan>("RequestTimeout"), TimeSpan.FromSeconds(10));
-
-						var ping = new PingResultPoco()
-						{
-							Url = link,
-							DateCreated = utcNow
-						};
-
-						var headResponse = await httpClient.SendAsync(headRequest, HttpCompletionOption.ResponseHeadersRead);
-
-						ping.StatusCode = headResponse.StatusCode;
-
-						// get title
-						if ((int)ping.StatusCode < 300)
-						{
-							var html = await httpClient.GetStringAsync(link);
-							ping.Title = GetHtmlTitle(html);
-							ping.IsLive = true;
-						}
-
-						result.Add(ping);
-					}
-					catch (Exception ex)
-					{
-						_logger.LogError(ex, ex.Message);
-					}
-				}
-
-				proxy.Stop();
-			}
-
-			return result;
-		}
-
-		private string GetHtmlTitle(string html)
-		{
-			try
-			{
-				var config = Configuration.Default.WithDefaultLoader();
-				using (var context = BrowsingContext.New(config))
-				{
-					var parser = context.GetService<IHtmlParser>();
-					var document = parser.ParseDocument(html);
-
-					var title = document.All.FirstOrDefault(m => m.LocalName == "title");
-					return title?.TextContent ?? "";
-				}
-			}
-			catch (Exception ex)
-			{
-				_logger.LogError(ex, ex.Message);
-				return "";
-			}
+			return ping;
 		}
 	}
 }
