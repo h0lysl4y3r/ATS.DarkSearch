@@ -5,8 +5,6 @@ using System.IO;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
 using ServiceStack;
-using ServiceStack.Logging;
-using ServiceStack.Logging.Serilog;
 
 Log.Logger = new LoggerConfiguration()
 	.MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -33,7 +31,7 @@ try
 		app.UseExceptionHandler("/Error");
 		// The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
 		app.UseHsts();
-		//app.UseHttpsRedirection();
+		app.UseHttpsRedirection();
 	}
 
 	app.UseSerilogRequestLogging();

@@ -1,6 +1,8 @@
+using System;
 using Funq;
 using Microsoft.AspNetCore.Hosting;
 using ServiceStack;
+using ServiceStack.Admin;
 using ServiceStack.Api.OpenApi;
 
 [assembly: HostingStartup(typeof(ATS.DarkSearch.AppHost))]
@@ -14,9 +16,7 @@ public class AppHost : AppHostBase, IHostingStartup
             //
         })
         .Configure(app => {
-
             app.UseServiceStack(new AppHost());
-            
         });
     
     public AppHost() : base("ATS.DarkSearch", typeof(AppHost).Assembly) 
@@ -25,13 +25,17 @@ public class AppHost : AppHostBase, IHostingStartup
 
     public override void Configure(Container container)
     {
-        Plugins.Add(new OpenApiFeature());
-
+        Plugins.Add(new AdminUsersFeature());
+        
         var hostConfig = new HostConfig
         {
+            UseSameSiteCookies = true,
             DefaultContentType = MimeTypes.Json,
-            DefaultRedirectPath = "/swagger-ui",
-            DebugMode = true
+            DefaultRedirectPath = "/ui",
+            DebugMode = true,
+#if DEBUG                
+            AdminAuthSecret = "adm1nSecret", // Enable Admin Access with ?authsecret=adm1nSecret
+#endif
         };
         SetConfig(hostConfig);
 
