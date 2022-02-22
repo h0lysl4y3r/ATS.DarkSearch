@@ -6,20 +6,18 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
 using ServiceStack;
 
-Log.Logger = new LoggerConfiguration()
-	.MinimumLevel.Override("Microsoft", LogEventLevel.Information)
-	.MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
-	.Enrich.FromLogContext()
-	.WriteTo.Console()
-	.WriteTo.Debug()
-	.WriteTo.File(path: "Logs/log.txt", rollingInterval: RollingInterval.Day)
-	.CreateLogger();
-
 try
 {
-	Log.Information("Starting web host");
 	var builder = WebApplication.CreateBuilder(args);
-	builder.Host.UseSerilog();
+
+	builder.Host.UseSerilog((ctx, lc) => lc
+		.MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+		.MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+		.Enrich.FromLogContext()
+		.WriteTo.Console()
+		.WriteTo.Debug()
+		.WriteTo.File(path: "Logs/log.txt", rollingInterval: RollingInterval.Day)
+	);
 	
 	var app = builder.Build();
 	if (app.Environment.IsDevelopment())
@@ -42,6 +40,7 @@ try
 
 	Licensing.RegisterLicenseFromFileIfExists(licensePath);
 	
+	Log.Information("Starting web host");
 	app.Run();
 }
 catch (Exception ex)

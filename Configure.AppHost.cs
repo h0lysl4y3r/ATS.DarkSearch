@@ -5,21 +5,23 @@ using ServiceStack;
 using ServiceStack.Admin;
 using ServiceStack.Api.OpenApi;
 
-[assembly: HostingStartup(typeof(ATS.DarkSearch.AppHost))]
+[assembly: HostingStartup(typeof(ATS.DarkSearch.ATSAppHost))]
 
 namespace ATS.DarkSearch;
 
-public class AppHost : AppHostBase, IHostingStartup
+public class ATSAppHost : AppHostBase, IHostingStartup
 {
+    public static string[] Links { get; private set; }
+
     public void Configure(IWebHostBuilder builder) => builder
         .ConfigureServices(services => {
             //
         })
         .Configure(app => {
-            app.UseServiceStack(new AppHost());
+            app.UseServiceStack(new ATSAppHost());
         });
     
-    public AppHost() : base("ATS.DarkSearch", typeof(AppHost).Assembly) 
+    public ATSAppHost() : base("ATS.DarkSearch", typeof(ATSAppHost).Assembly) 
     {
     }
 
@@ -43,5 +45,8 @@ public class AppHost : AppHostBase, IHostingStartup
         {
             AutoHandleOptionsRequests = true
         });
+        
+        //Links = System.IO.File.ReadAllLines(Path.Combine(_hostEnvironment.ContentRootPath, "Data", "links.txt"));
+        Links = new string[] { "http://lldan5gahapx5k7iafb3s4ikijc4ni7gx5iywdflkba5y2ezyg6sjgyd.onion" };
     }
 }
