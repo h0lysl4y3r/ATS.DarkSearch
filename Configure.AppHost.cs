@@ -1,9 +1,12 @@
 using System;
 using Funq;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using ServiceStack;
 using ServiceStack.Admin;
 using ServiceStack.Api.OpenApi;
+using ServiceStack.Messaging;
+using ServiceStack.RabbitMq;
 
 [assembly: HostingStartup(typeof(ATS.DarkSearch.ATSAppHost))]
 
@@ -15,10 +18,12 @@ public class ATSAppHost : AppHostBase, IHostingStartup
 
     public void Configure(IWebHostBuilder builder) => builder
         .ConfigureServices(services => {
-            //
+            services.AddSingleton<Spider>();
+            //services.AddHostedService<RabbitMqWorker>();
         })
         .Configure(app => {
-            app.UseServiceStack(new ATSAppHost());
+            if (!HasInit)
+                app.UseServiceStack(new ATSAppHost());
         });
     
     public ATSAppHost() : base("ATS.DarkSearch", typeof(ATSAppHost).Assembly) 
@@ -48,5 +53,19 @@ public class ATSAppHost : AppHostBase, IHostingStartup
         
         //Links = System.IO.File.ReadAllLines(Path.Combine(_hostEnvironment.ContentRootPath, "Data", "links.txt"));
         Links = new string[] { "http://lldan5gahapx5k7iafb3s4ikijc4ni7gx5iywdflkba5y2ezyg6sjgyd.onion" };
+        
+    }
+
+    private void ConfigureRabbitMq()
+    {
+        Register<IMessageService>(
+            new RabbitMqServer(AppSettings.GetString("ConnectionStrings:RabbitMq"))
+            {
+                DisablePublishingToOutq = true,
+            });
+        
+        //mqServer.RegisterHandler<Hello>(host.ExecuteMessage);
+        // using var mqClient = mqServer.CreateMessageQueueClient();
+        // mqClient.Publish(new Hello { Name = "Bugs Bunny" });
     }
 }
