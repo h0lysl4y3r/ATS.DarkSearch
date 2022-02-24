@@ -1,3 +1,4 @@
+using ATS.Common.Auth;
 using Microsoft.AspNetCore.Hosting;
 using ServiceStack;
 using ServiceStack.Auth;

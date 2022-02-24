@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ATS.Common.Auth;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceStack;

@@ -1,7 +1,9 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ServiceStack;
 using ServiceStack.Messaging;
 
 namespace ATS.DarkSearch;
@@ -11,24 +13,54 @@ public class RabbitMqWorker : BackgroundService
     private const int MqStatsDescriptionDurationMs = 60 * 1000;
 
     private readonly ILogger<RabbitMqWorker> _logger;
-    private readonly IMessageService _mqServer;
 
-    public RabbitMqWorker(ILogger<RabbitMqWorker> logger, IMessageService mqServer)
+    public RabbitMqWorker(ILogger<RabbitMqWorker> logger)
     {
         _logger = logger;
-        _mqServer = mqServer;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _mqServer.Start();
+        var mqServer = await GetAsync<IMessageService>(() => 
+            HostContext.AppHost?.Resolve<IMessageService>(), 1000, CancellationToken.None, true);
+        mqServer.Start();
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            _logger.LogInformation("MQ Worker running at: {stats}", this._mqServer.GetStatsDescription());
+            _logger.LogInformation("MQ Worker running at: {stats}", mqServer.GetStatsDescription());
             await Task.Delay(MqStatsDescriptionDurationMs, stoppingToken);
         }
 
-        _mqServer.Stop();
-    }    
+        mqServer.Stop();
+    }
+    
+    public static async Task<T> GetAsync<T>(Func<T> fn, int delayMs, CancellationToken cancellationToken, bool supressExceptions)
+        where T : class
+    {
+        return await Task.Run(async () =>
+        {
+            T instance = null;
+            while (true)
+            {
+                if (supressExceptions)
+                {
+                    try
+                    {
+                        instance = fn();
+                    }
+                    catch { }
+                }
+                else
+                {
+                    instance = fn();
+                }
+
+                if (instance != null) break;
+                
+                if (delayMs > 0)
+                    await Task.Delay(delayMs, cancellationToken);
+            }
+            return instance;
+        }, cancellationToken);
+    }
 }
