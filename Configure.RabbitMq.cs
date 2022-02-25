@@ -1,3 +1,4 @@
+using ATS.DarkSearch.Model;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceStack;
@@ -17,13 +18,15 @@ public class ConfigureRabbitMq : IHostingStartup
         })
         .ConfigureAppHost(appHost =>
         {
-            appHost.Register<IMessageService>(
-                new RabbitMqServer(appHost.AppSettings.GetString("ConnectionStrings:RabbitMq"))
-                {
-                    DisablePublishingToOutq = true,
-                });
+            var mqServer = new RabbitMqServer(appHost.AppSettings.GetString("ConnectionStrings:RabbitMq"))
+            {
+                DisablePublishingToOutq = true,
+                DisablePriorityQueues = true
+            };
+            appHost.Register<IMessageService>(mqServer);
         
-            //mqServer.RegisterHandler<Hello>(host.ExecuteMessage);
+            mqServer.RegisterHandler<Ping>(appHost.ExecuteMessage, 2);
+          
             // using var mqClient = mqServer.CreateMessageQueueClient();
             // mqClient.Publish(new Hello { Name = "Bugs Bunny" });
         });

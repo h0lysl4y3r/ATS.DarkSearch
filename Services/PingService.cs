@@ -1,5 +1,4 @@
-﻿using Serilog;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using ATS.Common.Poco;
 using ATS.DarkSearch.Model;
 using Microsoft.Extensions.Logging;
@@ -15,14 +14,13 @@ public class PingService : Service
 	public ILogger Logger => 
 		_logger ?? (_logger = LoggerFactory.CreateLogger(typeof(PingService)));
 	
-	public async Task<PingResultPoco> Post(PingRequest request)
+	public async Task<object> Any(Ping request)
 	{
 		if (request.Url.IsNullOrEmpty())
 			throw HttpError.BadRequest(nameof(request.Url));
 
 		Logger.LogInformation("Pinging " + request.Url);
-		Log.Information("Pinging " + request.Url);
-		
+
 		return new PingResultPoco();
 
 		var spider = this.Resolve<Spider>();

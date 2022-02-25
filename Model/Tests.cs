@@ -1,6 +1,10 @@
+using ServiceStack;
+
 namespace ATS.DarkSearch.Model;
 
-public class Ping
+[Route("/tests/ping")]
+public class TestPing
 {
     public string Url { get; set; }
 }
+

@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using ATS.DarkSearch.Model;
 using Microsoft.Extensions.Logging;
 using ServiceStack;
+using ServiceStack.Messaging;
 
 namespace ATS.DarkSearch.Services;
 
@@ -24,4 +25,5 @@ public class AdminService : Service
         await spider.StartAsync();
         return new HttpResult();
     }
+    
 }

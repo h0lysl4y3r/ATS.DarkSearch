@@ -12,3 +12,4 @@ public class GetUrlsRequest : IReturn<string[]>
 public class RestartSpiderRequest
 {
 }
+
