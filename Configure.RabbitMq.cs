@@ -25,7 +25,7 @@ public class ConfigureRabbitMq : IHostingStartup
             };
             appHost.Register<IMessageService>(mqServer);
         
-            mqServer.RegisterHandler<Ping>(appHost.ExecuteMessage, 2);
+            mqServer.RegisterHandler<Ping>(appHost.ExecuteMessage, 1);
           
             // using var mqClient = mqServer.CreateMessageQueueClient();
             // mqClient.Publish(new Hello { Name = "Bugs Bunny" });

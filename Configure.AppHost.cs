@@ -1,13 +1,8 @@
-using System;
 using Funq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using RabbitMQ.Client;
 using ServiceStack;
 using ServiceStack.Admin;
-using ServiceStack.Api.OpenApi;
-using ServiceStack.Messaging;
-using ServiceStack.RabbitMq;
 
 [assembly: HostingStartup(typeof(ATS.DarkSearch.ATSAppHost))]
 
@@ -18,6 +13,9 @@ public class ATSAppHost : AppHostBase, IHostingStartup
     public static string[] Links { get; private set; }
 
     public void Configure(IWebHostBuilder builder) => builder
+        .ConfigureServices(services => {
+            services.AddSingleton<CacheHelpers>();
+        })
         .Configure(app => {
             if (!HasInit)
                 app.UseServiceStack(new ATSAppHost());
@@ -49,6 +47,10 @@ public class ATSAppHost : AppHostBase, IHostingStartup
         });
         
         //Links = System.IO.File.ReadAllLines(Path.Combine(_hostEnvironment.ContentRootPath, "Data", "links.txt"));
-        Links = new string[] { "http://lldan5gahapx5k7iafb3s4ikijc4ni7gx5iywdflkba5y2ezyg6sjgyd.onion" };
+        Links = new string[]
+        {
+            "http://2gzyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion",
+            "http://lldan5gahapx5k7iafb3s4ikijc4ni7gx5iywdflkba5y2ezyg6sjgyd.onion"
+        };
     }
 }

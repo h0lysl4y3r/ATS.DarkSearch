@@ -21,8 +21,6 @@ public class PingService : Service
 
 		Logger.LogInformation("Pinging " + request.Url);
 
-		return new PingResultPoco();
-
 		var spider = this.Resolve<Spider>();
 		PingResultPoco ping = null;
 		try

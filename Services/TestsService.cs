@@ -11,7 +11,7 @@ public class TestsService : Service
         if (request.Url.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.Url));
         
-        var mqServer = HostContext.AppHost?.Resolve<IMessageService>();
+        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
         using var mqClient = mqServer.CreateMessageQueueClient();
         mqClient.Publish(new Ping()
         {

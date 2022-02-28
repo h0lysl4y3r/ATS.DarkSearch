@@ -25,5 +25,23 @@ public class AdminService : Service
         await spider.StartAsync();
         return new HttpResult();
     }
-    
+
+    public object Post(PingAllRequest request)
+    {
+        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+        using var mqClient = mqServer.CreateMessageQueueClient();
+
+        var links = ATSAppHost.Links;
+        foreach (var link in links)
+        {
+            Logger.LogInformation("Scheduling to ping: " + link);
+            
+            mqClient.Publish(new Ping()
+            {
+                Url = link
+            });
+        }
+
+        return new HttpResult();
+    }
 }

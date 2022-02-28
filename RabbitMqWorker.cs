@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using ATS.Common.Helpers;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ServiceStack;
@@ -21,7 +22,7 @@ public class RabbitMqWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var mqServer = await GetAsync<IMessageService>(() => 
+        var mqServer = await TaskHelpers.GetAsync<IMessageService>(() => 
             HostContext.AppHost?.Resolve<IMessageService>(), 1000, CancellationToken.None, true);
         mqServer.Start();
 
@@ -32,35 +33,5 @@ public class RabbitMqWorker : BackgroundService
         }
 
         mqServer.Stop();
-    }
-    
-    public static async Task<T> GetAsync<T>(Func<T> fn, int delayMs, CancellationToken cancellationToken, bool supressExceptions)
-        where T : class
-    {
-        return await Task.Run(async () =>
-        {
-            T instance = null;
-            while (true)
-            {
-                if (supressExceptions)
-                {
-                    try
-                    {
-                        instance = fn();
-                    }
-                    catch { }
-                }
-                else
-                {
-                    instance = fn();
-                }
-
-                if (instance != null) break;
-                
-                if (delayMs > 0)
-                    await Task.Delay(delayMs, cancellationToken);
-            }
-            return instance;
-        }, cancellationToken);
     }
 }
