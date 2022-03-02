@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using ServiceStack;
 using ServiceStack.Messaging;
 
-namespace ATS.DarkSearch;
+namespace ATS.DarkSearch.Workers;
 
 public class RabbitMqWorker : BackgroundService
 {

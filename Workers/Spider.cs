@@ -12,8 +12,9 @@ using Knapcode.TorSharp;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
 
-namespace ATS.DarkSearch;
+namespace ATS.DarkSearch.Workers;
 
 public class Spider : IDisposable
 {
@@ -106,21 +107,37 @@ public class Spider : IDisposable
             var ping = new PingResultPoco()
             {
                 Url = link,
-                DateCreated = DateTimeOffset.UtcNow
+                Date = DateTimeOffset.UtcNow
             };
+            var links = new List<string>();
 
             var headResponse = await _httpClient.SendAsync(headRequest, HttpCompletionOption.ResponseHeadersRead);
 
             ping.StatusCode = headResponse.StatusCode;
+            var statusCode = (int) ping.StatusCode;
 
             // get title
-            if ((int) ping.StatusCode < 300)
+            if (statusCode < 300)
             {
                 var html = await _httpClient.GetStringAsync(link);
                 ping.Title = GetHtmlTitle(html);
                 ping.IsLive = true;
             }
+            
+            // location?
+            if (statusCode >= 300 && statusCode < 400
+                && headResponse.Headers.TryGetValues(HeaderNames.Location, out var locations))
+            {
+                foreach (var item in locations)
+                {
+                    links.Add(item);
+                }
+                ping.IsLive = true;
+            }
 
+            if (links.Count > 0)
+                ping.Links = links.ToArray();
+            
             return ping;
         }
         catch (Exception ex)

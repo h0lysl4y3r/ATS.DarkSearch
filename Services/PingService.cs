@@ -1,6 +1,7 @@
 ﻿using System.Threading.Tasks;
 using ATS.Common.Poco;
 using ATS.DarkSearch.Model;
+using ATS.DarkSearch.Workers;
 using Microsoft.Extensions.Logging;
 using ServiceStack;
 using ILogger = Microsoft.Extensions.Logging.ILogger;

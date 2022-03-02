@@ -1,4 +1,5 @@
 using System;
+using ATS.Common.Poco;
 using Elasticsearch.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,10 +14,21 @@ public class ConfigureElastic : IHostingStartup
     public void Configure(IWebHostBuilder builder) => builder
         .ConfigureServices((context,services) =>
         {
+            services.AddSingleton<ElasticRepository>();
+
             var pool = new SingleNodeConnectionPool(new Uri(context.Configuration["ConnectionStrings:Elastic"]));
             var settings = new ConnectionSettings(pool)
-                .DefaultIndex("");
+                .DefaultIndex(ElasticRepository.PingsIndex)
+                .PrettyJson();
             var client = new ElasticClient(settings);
-            services.AddSingleton(client);            
+            services.AddSingleton(client);
+
+            if (!client.Indices.Exists(Indices.Parse(ElasticRepository.PingsIndex)).Exists)
+            {
+                var response = client.Indices.Create(Indices.Index(ElasticRepository.PingsIndex),
+                    index => index.Map<PingResultPoco>(
+                        x => x.AutoMap()
+                    ));
+            }
         });
 }

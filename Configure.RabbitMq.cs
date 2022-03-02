@@ -1,4 +1,5 @@
 using ATS.DarkSearch.Model;
+using ATS.DarkSearch.Workers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceStack;
@@ -14,7 +15,7 @@ public class ConfigureRabbitMq : IHostingStartup
     public void Configure(IWebHostBuilder builder) => builder
         .ConfigureServices(services => {
             services.AddSingleton<Spider>();
-            services.AddHostedService<RabbitMqWorker>();
+            services.AddHostedService<ATS.DarkSearch.Workers.RabbitMqWorker>();
         })
         .ConfigureAppHost(appHost =>
         {

@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using ATS.DarkSearch.Model;
+using ATS.DarkSearch.Workers;
 using Microsoft.Extensions.Logging;
 using ServiceStack;
 using ServiceStack.Messaging;
