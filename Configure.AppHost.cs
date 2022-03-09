@@ -11,8 +11,6 @@ namespace ATS.DarkSearch;
 
 public class ATSAppHost : AppHostBase, IHostingStartup
 {
-    public static string[] Links { get; private set; }
-
     public void Configure(IWebHostBuilder builder) => builder
         .ConfigureServices(services => {
         })
@@ -47,12 +45,5 @@ public class ATSAppHost : AppHostBase, IHostingStartup
         {
             AutoHandleOptionsRequests = true
         });
-        
-        //Links = System.IO.File.ReadAllLines(Path.Combine(_hostEnvironment.ContentRootPath, "Data", "links.txt"));
-        Links = new string[]
-        {
-            "http://2gzyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion",
-            "http://lldan5gahapx5k7iafb3s4ikijc4ni7gx5iywdflkba5y2ezyg6sjgyd.onion"
-        };
     }
 }

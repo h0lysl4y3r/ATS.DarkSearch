@@ -11,6 +11,7 @@ namespace ATS.DarkSearch.Workers;
 
 public class RabbitMqWorker : BackgroundService
 {
+    public const string DelayedMessagesExchange = "mx.servicestack.delayed";
     private const int MqStatsDescriptionDurationMs = 60 * 1000;
 
     private readonly ILogger<RabbitMqWorker> _logger;
@@ -28,7 +29,7 @@ public class RabbitMqWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            _logger.LogInformation("MQ Worker running at: {stats}", mqServer.GetStatsDescription());
+            _logger.LogDebug("MQ Worker running at: {stats}", mqServer.GetStatsDescription());
             await Task.Delay(MqStatsDescriptionDurationMs, stoppingToken);
         }
 

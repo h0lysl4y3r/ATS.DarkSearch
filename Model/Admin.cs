@@ -2,18 +2,35 @@ using ServiceStack;
 
 namespace ATS.DarkSearch.Model;
 
-// DEBUG
 [Route("/admin/urls", "GET")]
-public class GetUrlsRequest : IGet, IReturn<string[]>
+public class GetAllUrls : IGet, IReturn<GetAllUrlsResponse>
 {
 }
 
-[Route("/admin/restart-spider", "POST")]
-public class RestartSpiderRequest : IPost
+public class GetAllUrlsResponse
+{
+    public string[] Urls { get; set; }
+}
+
+[Route("/admin/spider-restart", "POST")]
+public class RestartSpider : IPost
 {
 }
 
 [Route("/admin/ping-all", "POST")]
-public class PingAllRequest : IPost
+public class PingAll : IPost
 {
+    public string LinkFileName { get; set; }
+}
+
+[Route("/admin/ping-republish", "POST")]
+public class RepublishPings : IPost
+{
+    public int Count { get; set; } = 10;
+}
+
+[Route("/admin/ping-republish-store", "POST")]
+public class RepublishPingsStore : IPost
+{
+    public int Count { get; set; } = 10;
 }

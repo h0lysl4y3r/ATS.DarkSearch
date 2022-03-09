@@ -14,21 +14,21 @@ public class ConfigureElastic : IHostingStartup
     public void Configure(IWebHostBuilder builder) => builder
         .ConfigureServices((context,services) =>
         {
-            services.AddSingleton<ElasticRepository>();
-
             var pool = new SingleNodeConnectionPool(new Uri(context.Configuration["ConnectionStrings:Elastic"]));
             var settings = new ConnectionSettings(pool)
-                .DefaultIndex(ElasticRepository.PingsIndex)
+                .DefaultIndex(PingsRepository.PingsIndex)
                 .PrettyJson();
             var client = new ElasticClient(settings);
             services.AddSingleton(client);
 
-            if (!client.Indices.Exists(Indices.Parse(ElasticRepository.PingsIndex)).Exists)
+            if (!client.Indices.Exists(Indices.Parse(PingsRepository.PingsIndex)).Exists)
             {
-                var response = client.Indices.Create(Indices.Index(ElasticRepository.PingsIndex),
+                var response = client.Indices.Create(Indices.Index(PingsRepository.PingsIndex),
                     index => index.Map<PingResultPoco>(
                         x => x.AutoMap()
                     ));
             }
+            
+            services.AddSingleton<PingsRepository>();
         });
 }

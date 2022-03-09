@@ -27,7 +27,7 @@ public class TestsService : Service
 
     public object Post(IndexAdd request)
     {
-        var repo = HostContext.AppHost.Resolve<ElasticRepository>();
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
         // repo.AddPing(new PingResultPoco()
         // {
         //     Url = "http://2gzyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion",
@@ -42,7 +42,7 @@ public class TestsService : Service
         //     Title = "hacking heaven",
         //     Description = "find all your hacking tools on this site"
         // });
-        repo.AddPing(new PingResultPoco()
+        repo.Add(new PingResultPoco()
         {
             Url = request.Url,
             Date = request.Date,
@@ -58,7 +58,7 @@ public class TestsService : Service
     
     public object Put(IndexUpdate request)
     {
-        var repo = HostContext.AppHost.Resolve<ElasticRepository>();
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
         // repo.UpdatePing(new PingResultPoco()
         // {
         //     Url = "http://2gzyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion",
@@ -66,7 +66,7 @@ public class TestsService : Service
         //     Title = "my onion site 2",
         //     Description = "this is a great onion site to look at 2"
         // });
-        repo.UpdatePing(new PingResultPoco()
+        repo.Update(new PingResultPoco()
         {
             Url = request.Url,
             Date = request.Date,
@@ -82,17 +82,27 @@ public class TestsService : Service
 
     public object Get(IndexGet request)
     {
-        var repo = HostContext.AppHost.Resolve<ElasticRepository>();
-        var ping = repo.GetPing(request.Url);
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
+        var ping = repo.Get(request.Url);
         return new IndexGetResponse()
         {
             Ping = ping
         };
     }
 
+    public object Get(IndexGetAllUrls request)
+    {
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
+        var urls = repo.GetUrls();
+        return new IndexGetAllUrlsResponse()
+        {
+            Urls = urls
+        };
+    }
+
     public object Post(IndexSearch request)
     {
-        var repo = HostContext.AppHost.Resolve<ElasticRepository>();
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
         var pings = repo.Search(request.Text);
         return new IndexSearchResponse()
         {

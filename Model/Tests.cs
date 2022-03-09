@@ -32,6 +32,16 @@ public class IndexGetResponse
     public PingResultPoco Ping { get; set; }
 }
 
+[Route("/tests/index-get-all", "GET")]
+public class IndexGetAllUrls : IGet, IReturn<IndexGetAllUrlsResponse>
+{
+}
+
+public class IndexGetAllUrlsResponse
+{
+    public string[] Urls { get; set; }
+}
+
 [Route("/tests/index-search", "POST")]
 public class IndexSearch : IPost, IReturn<IndexSearchResponse>
 {
