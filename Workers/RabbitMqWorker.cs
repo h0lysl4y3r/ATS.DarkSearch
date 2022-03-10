@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using ATS.Common.Helpers;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog;
 using ServiceStack;
 using ServiceStack.Messaging;
 
@@ -13,14 +14,7 @@ public class RabbitMqWorker : BackgroundService
 {
     public const string DelayedMessagesExchange = "mx.servicestack.delayed";
     private const int MqStatsDescriptionDurationMs = 60 * 1000;
-
-    private readonly ILogger<RabbitMqWorker> _logger;
-
-    public RabbitMqWorker(ILogger<RabbitMqWorker> logger)
-    {
-        _logger = logger;
-    }
-
+    
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var mqServer = await TaskHelpers.GetAsync<IMessageService>(() => 
@@ -29,7 +23,7 @@ public class RabbitMqWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            _logger.LogDebug("MQ Worker running at: {stats}", mqServer.GetStatsDescription());
+            Log.Information("MQ Worker running at: {stats}", mqServer.GetStatsDescription());
             await Task.Delay(MqStatsDescriptionDurationMs, stoppingToken);
         }
 

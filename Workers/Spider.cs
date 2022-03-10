@@ -12,8 +12,8 @@ using ATS.Common.Poco;
 using Knapcode.TorSharp;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
+using Serilog;
 
 namespace ATS.DarkSearch.Workers;
 
@@ -28,7 +28,6 @@ public class Spider : IDisposable
     }
     
     private readonly Microsoft.Extensions.Configuration.IConfiguration _config;
-    private readonly ILogger<Spider> _logger;
     private readonly IWebHostEnvironment _hostEnvironment;
 
     private TorSharpProxy _proxy;
@@ -36,11 +35,9 @@ public class Spider : IDisposable
     private HttpClient _httpClient;
 
     public Spider(Microsoft.Extensions.Configuration.IConfiguration config, 
-        ILogger<Spider> logger,
         IWebHostEnvironment hostEnvironment)
     {
         _config = config;
-        _logger = logger;
         _hostEnvironment = hostEnvironment;
     }
     
@@ -49,7 +46,7 @@ public class Spider : IDisposable
         if (_proxy != null)
             return;
         
-        _logger.LogInformation($"Starting {nameof(Spider)}...");
+        Log.Information($"Starting {nameof(Spider)}...");
 
         // configure
         _settings = new TorSharpSettings
@@ -69,11 +66,12 @@ public class Spider : IDisposable
         // download tools
         try
         {
+            Log.Debug($"Fetching tor...");
             await new TorSharpToolFetcher(_settings, new HttpClient()).FetchAsync();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, ex.Message);
+            Log.Error(ex, ex.Message);
             throw;
         }
 
@@ -86,9 +84,10 @@ public class Spider : IDisposable
         
         _httpClient = new HttpClient(handler);
         
+        Log.Debug($"Starting proxy...");
         await _proxy.ConfigureAndStartAsync();
 
-        _logger.LogInformation($"{nameof(Spider)} started");
+        Log.Information($"{nameof(Spider)} started");
     }
 
     public void Stop()
@@ -96,7 +95,7 @@ public class Spider : IDisposable
         if (_proxy == null)
             return;
 
-        _logger.LogInformation($"Stopping {nameof(Spider)}...");
+        Log.Information($"Stopping {nameof(Spider)}...");
 
         _httpClient?.Dispose();
         _httpClient = null;
@@ -105,7 +104,7 @@ public class Spider : IDisposable
         _proxy.Dispose();
         _proxy = null;
 
-        _logger.LogInformation($"{nameof(Spider)} stopped");
+        Log.Information($"{nameof(Spider)} stopped");
     }
 
     public async Task<PingResultPoco> ExecuteAsync(string url)
@@ -113,7 +112,7 @@ public class Spider : IDisposable
         if (_proxy == null || _httpClient == null)
             return null;
 
-        _logger.LogDebug($"{nameof(Spider)} requesting " + url);
+        Log.Debug($"{nameof(Spider)} requesting " + url);
 
         try
         {
@@ -135,7 +134,7 @@ public class Spider : IDisposable
 
             var headResponse = await _httpClient.SendAsync(headRequest, HttpCompletionOption.ResponseHeadersRead);
 
-            _logger.LogDebug($"{nameof(Spider)} with response " + headResponse.StatusCode);
+            Log.Debug($"{nameof(Spider)} with response " + headResponse.StatusCode);
 
             ping.StatusCode = headResponse.StatusCode;
             var statusCode = (int) ping.StatusCode;
@@ -177,7 +176,7 @@ public class Spider : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, ex.Message);
+            Log.Error(ex, ex.Message);
             throw;
         }
     }
@@ -221,7 +220,7 @@ public class Spider : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, ex.Message);
+            Log.Error(ex, ex.Message);
             return null;
         }
     }
@@ -231,6 +230,31 @@ public class Spider : IDisposable
         Stop();
     }
 
+    private Uri GetUriSafe(string url)
+    {
+        if (url == null)
+            return null;
+        
+        try
+        {
+            return new Uri(url);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+    
+    private string SanitizeUrlSchema(string url, string schema = "http")
+    {
+        if (url == null)
+            throw new ArgumentNullException(nameof(url));
+        if (schema != "http" && schema != "https")
+            throw new ArgumentException(nameof(schema));
+
+        return url.ToLower().StartsWith("http") ? url : $"{schema}://{url}";
+    }
+    
     private string StripUrlQuery(string url)
     {
         if (url == null)
@@ -238,9 +262,8 @@ public class Spider : IDisposable
 
         try
         {
-            var urlSanitized = url.ToLower().StartsWith("http") ? url : $"http://{url}";
-            var uri = new Uri(urlSanitized);
-            return $"{uri.Scheme}://{uri.DnsSafeHost}{uri.AbsolutePath}{uri.Fragment}";
+            var uri = new Uri(SanitizeUrlSchema(url));
+            return $"{uri.Scheme}://{uri.DnsSafeHost}{uri.AbsolutePath}";
         }
         catch
         {
@@ -248,10 +271,39 @@ public class Spider : IDisposable
         }
     }
 
+    private bool HasFirstLevelDomain(Uri uri, string domain)
+    {
+        if (uri == null)
+            throw new ArgumentNullException(nameof(uri));
+        if (domain == null)
+            throw new ArgumentNullException(nameof(domain));
+
+        if (uri.DnsSafeHost.Length == 0)
+            return false;
+
+        var dotIndex = uri.DnsSafeHost.LastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == uri.DnsSafeHost.Length - 1)
+            return uri.DnsSafeHost.Equals(domain, StringComparison.InvariantCultureIgnoreCase);
+
+        var firstLevelDomain = uri.DnsSafeHost.Substring(dotIndex + 1);
+
+        return firstLevelDomain.Equals(domain, StringComparison.InvariantCultureIgnoreCase);
+    }
+
     private List<string> SanitizeLinks(List<string> links)
     {
         for (int i = 0; i < links.Count; i++)
         {
+            var uri = GetUriSafe(SanitizeUrlSchema(links[i]));
+            if (uri == null
+                || uri.IsFile
+                || !HasFirstLevelDomain(uri, "onion"))
+            {
+                links.RemoveAt(i);
+                i--;
+                continue;
+            }
+
             links[i] = StripUrlQuery(links[i]);
         }
 

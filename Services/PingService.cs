@@ -1,26 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using ATS.Common.Extensions;
 using ATS.Common.Poco;
-using ATS.DarkSearch.Extensions;
 using ATS.DarkSearch.Model;
 using ATS.DarkSearch.Workers;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
+using Serilog;
 using ServiceStack;
 using ServiceStack.Messaging;
 using ServiceStack.RabbitMq;
-using ILogger = Microsoft.Extensions.Logging.ILogger;
+using RabbitMqWorker = ATS.DarkSearch.Workers.RabbitMqWorker;
 
 namespace ATS.DarkSearch.Services;
 
 public class PingService : Service
 {
-	public ILoggerFactory LoggerFactory { get; set; }
-	private ILogger _logger;
-	public ILogger Logger => 
-		_logger ?? (_logger = LoggerFactory.CreateLogger(typeof(PingService)));
-	
 	public async Task<object> Any(Ping request)
 	{
 		if (request.Url.IsNullOrEmpty())
@@ -43,7 +38,7 @@ public class PingService : Service
 		if (ping == null)
 		{
 			var message = $"{nameof(PingService)}:{nameof(Ping)} no ping result on " + request.Url;
-			_logger.LogError(message);
+			Log.Error(message);
 			throw new Exception(message);
 		}
 		
@@ -51,7 +46,7 @@ public class PingService : Service
 		var mqServer = HostContext.AppHost.Resolve<IMessageService>();
 		using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
 
-		Logger.LogDebug("Scheduling store of " + request.Url);
+		Log.Debug("Scheduling store of " + request.Url);
 		mqClient.Publish(new StorePing()
 		{
 			Ping = ping
@@ -63,7 +58,7 @@ public class PingService : Service
 			for (int i = 0; i < ping.Links.Length; i++)
 			{
 				var link = ping.Links[i];
-				Logger.LogDebug("Scheduling new ping for " + link);
+				Log.Debug("Scheduling new ping for " + link);
 				mqClient.Publish(new Ping()
 				{
 					Url = link
@@ -72,7 +67,7 @@ public class PingService : Service
 		}
 		
 		// update ping
-		var config = Request.Resolve<Microsoft.Extensions.Configuration.IConfiguration>();
+		var config = Request.Resolve<IConfiguration>();
 		mqClient.PublishDelayed(new Message<UpdatePing>(
 			new UpdatePing()
 			{
@@ -80,7 +75,7 @@ public class PingService : Service
 			})
 		{
 			Meta = new Dictionary<string, string>() { { "x-delay", config.GetValue<string>("AppSettings:RefreshPingIntervalMs") } }
-		});
+		}, RabbitMqWorker.DelayedMessagesExchange);
 
 		return ping;
 	}
@@ -118,7 +113,7 @@ public class PingService : Service
 
 		if (ping != null)
 		{
-			Logger.LogWarning("Ping already stored for " + request.Url);
+			Log.Warning("Ping already stored for " + request.Url);
 			return new HttpResult();
 		}
 
@@ -134,7 +129,7 @@ public class PingService : Service
 
 	public object Any(UpdatePing request)
 	{
-		Logger.LogDebug(nameof(UpdatePing) + " called");
+		Log.Debug(nameof(UpdatePing) + " called");
 		return new HttpResult();
 	}
 }

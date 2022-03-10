@@ -1,5 +1,4 @@
 using Serilog;
-using Serilog.Events;
 using System;
 using System.IO;
 using Microsoft.AspNetCore.Builder;
@@ -11,12 +10,11 @@ try
 	var builder = WebApplication.CreateBuilder(args);
 
 	builder.Host.UseSerilog((ctx, lc) => lc
-		.MinimumLevel.Override("Microsoft", LogEventLevel.Information)
-		.MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
 		.Enrich.FromLogContext()
 		.WriteTo.Console()
 		.WriteTo.Debug()
 		.WriteTo.File(path: "Logs/log.txt", rollingInterval: RollingInterval.Day)
+		.ReadFrom.Configuration(ctx.Configuration)
 	);
 	
 	var app = builder.Build();
@@ -36,7 +34,7 @@ try
 
 	var licensePath = "~/Data/ServiceStackLicense.txt".MapServerPath();
 	if (!File.Exists(licensePath))
-		Log.Logger.Error("License path does not exist: " + licensePath);
+		Log.Error("License path does not exist: " + licensePath);
 
 	Licensing.RegisterLicenseFromFileIfExists(licensePath);
 	

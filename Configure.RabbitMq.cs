@@ -1,12 +1,10 @@
-using System.Collections.Generic;
+using ATS.Common.ServiceStack;
 using ATS.DarkSearch.Model;
 using ATS.DarkSearch.Workers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using ServiceStack;
 using ServiceStack.Messaging;
-using ServiceStack.RabbitMq;
-using RabbitMQ.Client;
 using RabbitMqWorker = ATS.DarkSearch.Workers.RabbitMqWorker;
 
 [assembly: HostingStartup(typeof(ATS.DarkSearch.ConfigureRabbitMq))]
@@ -23,7 +21,8 @@ public class ConfigureRabbitMq : IHostingStartup
         })
         .ConfigureAppHost(appHost =>
         {
-            var mqServer = new ATSRabbitMqServer(appHost.AppSettings.GetString("ConnectionStrings:RabbitMq"))
+            var mqServer = new ATSRabbitMqServer(RabbitMqWorker.DelayedMessagesExchange,
+                appHost.AppSettings.GetString("ConnectionStrings:RabbitMq"))
             {
                 DisablePublishingToOutq = true,
                 DisablePublishingResponses = true,
