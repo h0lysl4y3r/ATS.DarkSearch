@@ -30,6 +30,45 @@ public class AdminService : Service
         };
     }
     
+    public object Get(GetPing request)
+    {
+        if (request.Url.IsNullOrEmpty())
+            throw HttpError.BadRequest(nameof(request.Url));
+
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
+        var ping = repo.Get(request.Url);
+
+        return new GetPingResponse()
+        {
+            Ping = ping
+        };
+    }
+
+    public object Delete(DeletePing request)
+    {
+        if (request.Url.IsNullOrEmpty())
+            throw HttpError.BadRequest(nameof(request.Url));
+
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
+        if (!repo.Delete(request.Url))
+            throw HttpError.ServiceUnavailable("ServiceUnavailable");
+        
+        return new HttpResult();
+    }
+
+    public object Delete(DeleteAllPings request)
+    {
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
+        var urls = repo.GetUrls();
+        foreach (var url in urls)
+        {
+            if (!repo.Delete(url))
+                throw HttpError.ServiceUnavailable(url);
+        }
+        
+        return new HttpResult();
+    }
+
     public async Task<object> Put(RestartSpider request)
     {
         var spider = this.Resolve<Spider>();
@@ -64,7 +103,8 @@ public class AdminService : Service
             throw HttpError.NotFound(nameof(request.LinkFileName));
             
         var links = File.ReadAllLines(filePath)
-            .Where(x => x.Length > 0)
+            .Where(x => x.Trim().Length > 0
+                && !x.Trim().StartsWith("#"))
             .ToArray();
         if (links.Length == 0)
             throw HttpError.ExpectationFailed(nameof(request.LinkFileName));

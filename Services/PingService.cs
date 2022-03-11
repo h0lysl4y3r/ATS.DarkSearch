@@ -129,7 +129,19 @@ public class PingService : Service
 
 	public object Any(UpdatePing request)
 	{
-		Log.Debug(nameof(UpdatePing) + " called");
+		if (request.Url.IsNullOrEmpty())
+			throw HttpError.BadRequest(nameof(request.Url));
+
+		var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+		using var mqClient = mqServer.CreateMessageQueueClient();
+
+		Log.Debug("Update ping of " + request.Url);
+        
+		mqClient.Publish(new Ping()
+		{
+			Url = request.Url
+		});
+
 		return new HttpResult();
 	}
 }

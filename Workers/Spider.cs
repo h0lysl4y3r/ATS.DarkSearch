@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using AngleSharp;
 using AngleSharp.Html.Dom;
 using AngleSharp.Html.Parser;
+using ATS.Common.Extensions;
+using ATS.Common.Helpers;
 using ATS.Common.Poco;
 using Knapcode.TorSharp;
 using Microsoft.AspNetCore.Hosting;
@@ -118,10 +120,24 @@ public class Spider : IDisposable
         {
             await _proxy.GetNewIdentityAsync();
 
-            var headRequest = new HttpRequestMessage(HttpMethod.Head, url);
-            headRequest.Options.Set(new HttpRequestOptionsKey<TimeSpan>("RequestTimeout"),
-                TimeSpan.FromSeconds(10));
+            // GET request url with 30s timeout 
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Options.Set(new HttpRequestOptionsKey<TimeSpan>("RequestTimeout"),
+                TimeSpan.FromSeconds(30));
+            
+            var response = await _httpClient.SendAsync(request);
+            var reason = response.ReasonPhrase ?? "N/A";
+            Log.Debug($"{nameof(Spider)} with response {response.StatusCode} ({reason})");
 
+            // document must be of text/html content-type
+            var contentType = response.GetHeaderValueSafe(HeaderNames.ContentType);
+            if (contentType == null
+                || !contentType.Contains("text/html"))
+            {
+                return null;
+            }
+
+            // create ping result
             var utcNow = DateTimeOffset.UtcNow;
             var ping = new PingResultPoco()
             {
@@ -131,18 +147,14 @@ public class Spider : IDisposable
                 Domain = new Uri(url).DnsSafeHost
             };
             var links = new List<string>();
-
-            var headResponse = await _httpClient.SendAsync(headRequest, HttpCompletionOption.ResponseHeadersRead);
-
-            Log.Debug($"{nameof(Spider)} with response " + headResponse.StatusCode);
-
-            ping.StatusCode = headResponse.StatusCode;
+            
+            ping.StatusCode = response.StatusCode;
             var statusCode = (int) ping.StatusCode;
-
-            // get title
+            
+            // get content if 2xx result code
             if (statusCode < 300)
             {
-                var html = await _httpClient.GetStringAsync(url);
+                var html = await response.Content.ReadAsStringAsync();
                 var textContent = GetTextContent(html);
                 ping.Title = textContent.Title;
                 ping.Description = textContent.Description;
@@ -153,9 +165,9 @@ public class Spider : IDisposable
                     links = textContent.Links.ToList();
             }
             
-            // location?
+            // get location if 3xx result code
             if (statusCode >= 300 && statusCode < 400
-                && headResponse.Headers.TryGetValues(HeaderNames.Location, out var locations))
+                                  && response.Headers.TryGetValues(HeaderNames.Location, out var locations))
             {
                 foreach (var item in locations)
                 {
@@ -166,8 +178,11 @@ public class Spider : IDisposable
                 }
                 ping.IsLive = true;
             }
-            
-            SanitizeLinks(links);
+
+            // sanitize links
+            // 1) top level domain must be .onion
+            // 2) query and fragment is stripped
+            links = SanitizeLinks(links, url);
 
             if (links.Count > 0)
                 ping.Links = links.ToArray();
@@ -229,85 +244,36 @@ public class Spider : IDisposable
     {
         Stop();
     }
-
-    private Uri GetUriSafe(string url)
+    
+    private List<string> SanitizeLinks(List<string> links, string originalUrl)
     {
-        if (url == null)
-            return null;
+        var originalUri = new Uri(originalUrl);
+        var result = new List<string>();
         
-        try
-        {
-            return new Uri(url);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-    
-    private string SanitizeUrlSchema(string url, string schema = "http")
-    {
-        if (url == null)
-            throw new ArgumentNullException(nameof(url));
-        if (schema != "http" && schema != "https")
-            throw new ArgumentException(nameof(schema));
-
-        return url.ToLower().StartsWith("http") ? url : $"{schema}://{url}";
-    }
-    
-    private string StripUrlQuery(string url)
-    {
-        if (url == null)
-            throw new ArgumentNullException(nameof(url));
-
-        try
-        {
-            var uri = new Uri(SanitizeUrlSchema(url));
-            return $"{uri.Scheme}://{uri.DnsSafeHost}{uri.AbsolutePath}";
-        }
-        catch
-        {
-            return url;
-        }
-    }
-
-    private bool HasFirstLevelDomain(Uri uri, string domain)
-    {
-        if (uri == null)
-            throw new ArgumentNullException(nameof(uri));
-        if (domain == null)
-            throw new ArgumentNullException(nameof(domain));
-
-        if (uri.DnsSafeHost.Length == 0)
-            return false;
-
-        var dotIndex = uri.DnsSafeHost.LastIndexOf('.');
-        if (dotIndex < 0 || dotIndex == uri.DnsSafeHost.Length - 1)
-            return uri.DnsSafeHost.Equals(domain, StringComparison.InvariantCultureIgnoreCase);
-
-        var firstLevelDomain = uri.DnsSafeHost.Substring(dotIndex + 1);
-
-        return firstLevelDomain.Equals(domain, StringComparison.InvariantCultureIgnoreCase);
-    }
-
-    private List<string> SanitizeLinks(List<string> links)
-    {
         for (int i = 0; i < links.Count; i++)
         {
-            var uri = GetUriSafe(SanitizeUrlSchema(links[i]));
+            Uri uri = null;
+            if (links[i].StartsWith("/"))
+                uri = UriHelpers.GetUriSafe($"{originalUri.Scheme}://{originalUri.DnsSafeHost}{links[i]}");
+            else
+                uri = UriHelpers.GetUriSafe(UriHelpers.SanitizeUrlScheme(links[i]));
+            
             if (uri == null
-                || uri.IsFile
-                || !HasFirstLevelDomain(uri, "onion"))
+                || !uri.TopLevelDomain().Equals("onion", StringComparison.InvariantCultureIgnoreCase))
             {
-                links.RemoveAt(i);
-                i--;
                 continue;
             }
 
-            links[i] = StripUrlQuery(links[i]);
+            var strippedLink = UriHelpers.StripUrlQuery(links[i], false);
+            if (strippedLink.Equals(originalUrl, StringComparison.InvariantCultureIgnoreCase))
+            {
+                continue;
+            }
+
+            result.Add(strippedLink);
         }
 
-        return links.GroupBy(x => x)
+        return result.GroupBy(x => x)
             .Select(x => x.Key)
             .ToList();
     }

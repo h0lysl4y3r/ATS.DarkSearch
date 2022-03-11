@@ -1,3 +1,5 @@
+using ATS.Common.Poco;
+using Nest;
 using ServiceStack;
 
 namespace ATS.DarkSearch.Model;
@@ -7,9 +9,31 @@ public class GetAllUrls : IGet, IReturn<GetAllUrlsResponse>
 {
 }
 
+[Route("/admin/pings", "GET")]
+public class GetPing : IGet, IReturn<GetPingResponse>
+{
+    public string Url { get; set; }
+}
+
+public class GetPingResponse
+{
+    public PingResultPoco Ping { get; set; }
+}
+
 public class GetAllUrlsResponse
 {
     public string[] Urls { get; set; }
+}
+
+[Route("/admin/pings", "DELETE")]
+public class DeletePing : IDelete
+{
+    public string Url { get; set; }
+}
+
+[Route("/admin/pings/all", "DELETE")]
+public class DeleteAllPings : IDelete
+{
 }
 
 [Route("/admin/spider/restart", "PUT")]

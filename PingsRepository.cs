@@ -74,20 +74,29 @@ public class PingsRepository
         return response.Found ? response.Source : null;
     }
 
-    public void Add(PingResultPoco ping)
+    public bool Add(PingResultPoco ping)
     {
         if (ping == null)
             throw new ArgumentNullException(nameof(ping));
 
-        _client.IndexDocument(ping);
+        return _client.IndexDocument(ping).IsValid;
     }
     
-    public void Update(PingResultPoco ping)
+    public bool Update(PingResultPoco ping)
     {
         if (ping == null)
             throw new ArgumentNullException(nameof(ping));
 
-        _client.Update<PingResultPoco, PingResultPoco>(
-            ping.Url.ToString(), x => x.Doc(ping));
+        return _client.Update<PingResultPoco, PingResultPoco>(
+            ping.Url.ToString(), x => x.Doc(ping))
+            .IsValid;
+    }
+    
+    public bool Delete(string url)
+    {
+        if (url == null)
+            throw new ArgumentNullException(nameof(url));
+
+        return _client.Delete<PingResultPoco>(url).IsValid;
     }
 }

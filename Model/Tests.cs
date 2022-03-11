@@ -50,5 +50,5 @@ public class IndexSearch : IPost, IReturn<IndexSearchResponse>
 
 public class IndexSearchResponse
 {
-    public PingResultPoco[] Pings { get; set; }
+    public SearchResultPoco[] Results { get; set; }
 }

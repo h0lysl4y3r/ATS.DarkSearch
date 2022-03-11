@@ -104,9 +104,12 @@ public class TestsService : Service
     {
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
         var pings = repo.Search(request.Text);
+       
         return new IndexSearchResponse()
         {
-            Pings = pings.ToArray()
+            Results = pings
+                .Select(x => new SearchResultPoco().PopulateFromPing(x))
+                .ToArray()
         };
     }
 }
