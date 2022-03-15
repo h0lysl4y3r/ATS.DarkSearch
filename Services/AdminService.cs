@@ -9,7 +9,6 @@ using ATS.DarkSearch.Model;
 using ATS.DarkSearch.Workers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Serilog;
 using ServiceStack;
 using ServiceStack.Messaging;
@@ -23,9 +22,10 @@ public class AdminService : Service
     public object Get(GetAllUrls request)
     {
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
-        var urls = repo.GetUrls();
+        var urls = repo.GetUrls(request.InputScrollId, out var outputScrollId, request.MaxResults);
         return new GetAllUrlsResponse()
         {
+            OutputScrollId = outputScrollId,
             Urls = urls
         };
     }
@@ -58,12 +58,25 @@ public class AdminService : Service
 
     public object Delete(DeleteAllPings request)
     {
+        var config = Request.Resolve<IConfiguration>();
+        if (request.AccessKey != config.GetValue<string>("AppSettings:AccessKey"))
+            throw HttpError.Forbidden(nameof(request.AccessKey));
+        
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
-        var urls = repo.GetUrls();
-        foreach (var url in urls)
+
+        string inputScrollId = null;
+        while (true)
         {
-            if (!repo.Delete(url))
-                throw HttpError.ServiceUnavailable(url);
+            var urls = repo.GetUrls(inputScrollId, out var outputScrollId);
+            if (urls.Length == 0)
+                break;
+
+            inputScrollId = outputScrollId;
+            foreach (var url in urls)
+            {
+                if (!repo.Delete(url))
+                    throw HttpError.ServiceUnavailable(url);
+            }
         }
         
         return new HttpResult();
@@ -94,6 +107,10 @@ public class AdminService : Service
 
     public object Post(PingAll request)
     {
+        var config = Request.Resolve<IConfiguration>();
+        if (request.AccessKey != config.GetValue<string>("AppSettings:AccessKey"))
+            throw HttpError.Forbidden(nameof(request.AccessKey));
+
         if (request.LinkFileName.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.LinkFileName));
 
@@ -108,20 +125,37 @@ public class AdminService : Service
             .ToArray();
         if (links.Length == 0)
             throw HttpError.ExpectationFailed(nameof(request.LinkFileName));
-        
+
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
         var mqServer = HostContext.AppHost.Resolve<IMessageService>();
         using var mqClient = mqServer.CreateMessageQueueClient();
 
         foreach (var link in links)
         {
-            Log.Debug("Scheduling ping of " + link);
-            
+            var existingPing = repo.Get(link);
+            if (existingPing != null)
+            {
+                Log.Debug($"{nameof(AdminService)}:{nameof(PingAll)} Skipping, ping of " + link + " exists");
+                continue;
+            }
+
+            Log.Debug($"{nameof(AdminService)}:{nameof(PingAll)} Scheduling ping of " + link);
             mqClient.Publish(new Ping()
             {
                 Url = link
             });
         }
 
+        return new HttpResult();
+    }
+
+    public object Put(UpdateSinglePing request)
+    {
+        if (request.Url.IsNullOrEmpty())
+            throw HttpError.BadRequest(nameof(request.Url));
+        
+        PingService.UpdatePing(request.Url);
+        
         return new HttpResult();
     }
     

@@ -18,8 +18,10 @@ public class PingsRepository
         _client = client;
     }
     
-    public IReadOnlyCollection<PingResultPoco> Search(string text, int from = 0, int size = 10)
+    public IReadOnlyCollection<PingResultPoco> Search(string text, out long total, int from = 0, int size = 10)
     {
+        total = 0;
+        
         if (text == null)
             throw new ArgumentNullException(nameof(text));
         
@@ -33,32 +35,52 @@ public class PingsRepository
                         .Field(f2 => f2.Description))
                     .Query(text))));
 
+        total = response.Total;
         return response.Documents;
     }
 
-    public string[] GetUrls()
+    public string[] GetUrls(string inputScrollId, out string outputScrollId, int maxResults = 1000)
     {
-        var response = _client.Search<PingResultPoco>(s => s
-            .Source(sf => sf
-                .Includes(i => i 
-                    .Fields(
-                        f => f.Url
+        if (maxResults <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxResults));
+        
+        outputScrollId = null;
+
+        ISearchResponse<PingResultPoco> response = null;
+        if (!inputScrollId.IsNullOrEmpty())
+        {
+            response = _client.Scroll<PingResultPoco>("10s", inputScrollId);
+        }
+        else
+        {
+            response = _client.Search<PingResultPoco>(s => s
+                .Source(sf => sf
+                    .Includes(i => i 
+                        .Fields(
+                            f => f.Url
+                        )
                     )
                 )
-            )
-            .Query(q => q
-                .MatchAll()
-            )
-            .Scroll("10s") 
-        );
+                .Query(q => q
+                    .MatchAll()
+                )
+                .Scroll("10s") 
+            );
+        }
 
         var urls = new List<string>();
-        while (response.Documents.Any()) 
+        while (response.Documents.Any())
         {
+            outputScrollId = response.ScrollId;
+            
             foreach (var document in response.Documents)
             {
                 urls.Add(document.Url);
             }
+
+            if (urls.Count >= maxResults)
+                break;
+
             response = _client.Scroll<PingResultPoco>("10s", response.ScrollId);
         }
 

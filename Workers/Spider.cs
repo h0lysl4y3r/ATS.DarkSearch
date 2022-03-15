@@ -156,9 +156,11 @@ public class Spider : IDisposable
             {
                 var html = await response.Content.ReadAsStringAsync();
                 var textContent = GetTextContent(html);
-                ping.Title = textContent.Title;
-                ping.Description = textContent.Description;
-                ping.Texts = textContent.Texts;
+                ping.Title = CollapseWhitespace(textContent.Title);
+                ping.Description = CollapseWhitespace(textContent.Description);
+                ping.Texts = textContent.Texts
+                    .Select(CollapseWhitespace)
+                    .ToArray();
                 ping.IsLive = true;
 
                 if (textContent.Links.Length > 0)
@@ -238,6 +240,25 @@ public class Spider : IDisposable
             Log.Error(ex, ex.Message);
             return null;
         }
+    }
+
+    private string CollapseWhitespace(string text)
+    {
+        if (text == null)
+            throw new ArgumentNullException(nameof(text));
+        if (text.Length == 0)
+            return text;
+
+        var result = text;
+        while (true)
+        {
+            var length = result.Length;
+            result = result.Replace("  ", " ");
+            if (result.Length == length)
+                break;
+        }
+
+        return result;
     }
 
     public void Dispose()

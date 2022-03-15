@@ -7,6 +7,14 @@ namespace ATS.DarkSearch.Model;
 [Route("/admin/urls", "GET")]
 public class GetAllUrls : IGet, IReturn<GetAllUrlsResponse>
 {
+    public string InputScrollId { get; set; }
+    public int MaxResults { get; set; }
+}
+
+public class GetAllUrlsResponse
+{
+    public string OutputScrollId { get; set; }
+    public string[] Urls { get; set; }
 }
 
 [Route("/admin/pings", "GET")]
@@ -20,11 +28,6 @@ public class GetPingResponse
     public PingResultPoco Ping { get; set; }
 }
 
-public class GetAllUrlsResponse
-{
-    public string[] Urls { get; set; }
-}
-
 [Route("/admin/pings", "DELETE")]
 public class DeletePing : IDelete
 {
@@ -34,11 +37,20 @@ public class DeletePing : IDelete
 [Route("/admin/pings/all", "DELETE")]
 public class DeleteAllPings : IDelete
 {
+    public string AccessKey { get; set; }
 }
 
-[Route("/admin/spider/restart", "PUT")]
-public class RestartSpider : IPut
+[Route("/admin/pings/all", "POST")]
+public class PingAll : IPost
 {
+    public string AccessKey { get; set; }
+    public string LinkFileName { get; set; }
+}
+
+[Route("/admin/pings", "PUT")]
+public class UpdateSinglePing : IPut
+{
+    public string Url { get; set; }
 }
 
 [Route("/admin/queues/purge", "DELETE")]
@@ -47,10 +59,9 @@ public class PurgeQueues : IDelete
     public string TypeFullName { get; set; }
 }
 
-[Route("/admin/ping-all", "POST")]
-public class PingAll : IPost
+[Route("/admin/spider/restart", "PUT")]
+public class RestartSpider : IPut
 {
-    public string LinkFileName { get; set; }
 }
 
 [Route("/admin/republish/ping", "POST")]

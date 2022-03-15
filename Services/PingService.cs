@@ -10,6 +10,7 @@ using Serilog;
 using ServiceStack;
 using ServiceStack.Messaging;
 using ServiceStack.RabbitMq;
+using ServiceStack.Web;
 using RabbitMqWorker = ATS.DarkSearch.Workers.RabbitMqWorker;
 
 namespace ATS.DarkSearch.Services;
@@ -18,16 +19,23 @@ public class PingService : Service
 {
 	public async Task<object> Any(Ping request)
 	{
-		if (request.Url.IsNullOrEmpty())
-			throw HttpError.BadRequest(nameof(request.Url));
+		return await Ping(Request, request.Url, true);
+	}
+
+	public static async Task<PingResultPoco> Ping(IRequest request, string url, bool publishUpdate)
+	{
+		if (request == null)
+			throw HttpError.BadRequest(nameof(request));
+		if (url.IsNullOrEmpty())
+			throw HttpError.BadRequest(nameof(url));
 
 		// Ping
-		var spider = this.Resolve<Spider>();
+		var spider = request.Resolve<Spider>();
 		PingResultPoco ping = null;
 		try
 		{
 			await spider.StartAsync();
-			ping = await spider.ExecuteAsync(request.Url);
+			ping = await spider.ExecuteAsync(url);
 		}
 		catch
 		{
@@ -37,7 +45,7 @@ public class PingService : Service
 
 		if (ping == null)
 		{
-			var message = $"{nameof(PingService)}:{nameof(Ping)} no ping result on " + request.Url;
+			var message = $"{nameof(PingService)}:{nameof(Ping)} no ping result on " + url;
 			Log.Error(message);
 			throw new Exception(message);
 		}
@@ -46,7 +54,7 @@ public class PingService : Service
 		var mqServer = HostContext.AppHost.Resolve<IMessageService>();
 		using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
 
-		Log.Debug("Scheduling store of " + request.Url);
+		Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling store of " + url);
 		mqClient.Publish(new StorePing()
 		{
 			Ping = ping
@@ -58,7 +66,7 @@ public class PingService : Service
 			for (int i = 0; i < ping.Links.Length; i++)
 			{
 				var link = ping.Links[i];
-				Log.Debug("Scheduling new ping for " + link);
+				Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling new ping for " + link);
 				mqClient.Publish(new Ping()
 				{
 					Url = link
@@ -67,7 +75,7 @@ public class PingService : Service
 		}
 		
 		// update ping
-		var config = Request.Resolve<IConfiguration>();
+		var config = request.Resolve<IConfiguration>();
 		mqClient.PublishDelayed(new Message<UpdatePing>(
 			new UpdatePing()
 			{
@@ -113,7 +121,7 @@ public class PingService : Service
 
 		if (ping != null)
 		{
-			Log.Warning("Ping already stored for " + request.Url);
+			Log.Warning($"{nameof(PingService)}:{nameof(TryNewPing)} Ping already stored for " + request.Url);
 			return new HttpResult();
 		}
 
@@ -132,16 +140,21 @@ public class PingService : Service
 		if (request.Url.IsNullOrEmpty())
 			throw HttpError.BadRequest(nameof(request.Url));
 
+		UpdatePing(request.Url);
+
+		return new HttpResult();
+	}
+
+	public static void UpdatePing(string url)
+	{
 		var mqServer = HostContext.AppHost.Resolve<IMessageService>();
 		using var mqClient = mqServer.CreateMessageQueueClient();
 
-		Log.Debug("Update ping of " + request.Url);
+		Log.Debug($"{nameof(PingService)}:{nameof(UpdatePing)} Update ping of " + url);
         
 		mqClient.Publish(new Ping()
 		{
-			Url = request.Url
+			Url = url
 		});
-
-		return new HttpResult();
 	}
 }

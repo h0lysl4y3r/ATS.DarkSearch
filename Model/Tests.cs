@@ -35,10 +35,13 @@ public class IndexGetResponse
 [Route("/tests/index-get-all", "GET")]
 public class IndexGetAllUrls : IGet, IReturn<IndexGetAllUrlsResponse>
 {
+    public string InputScrollId { get; set; }
+    public int MaxResults { get; set; }
 }
 
 public class IndexGetAllUrlsResponse
 {
+    public string OutputScrollId { get; set; }
     public string[] Urls { get; set; }
 }
 
@@ -50,5 +53,6 @@ public class IndexSearch : IPost, IReturn<IndexSearchResponse>
 
 public class IndexSearchResponse
 {
+    public long Total { get; set; }
     public SearchResultPoco[] Results { get; set; }
 }

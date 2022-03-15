@@ -93,9 +93,10 @@ public class TestsService : Service
     public object Get(IndexGetAllUrls request)
     {
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
-        var urls = repo.GetUrls();
+        var urls = repo.GetUrls(request.InputScrollId, out var outputScrollId, request.MaxResults);
         return new IndexGetAllUrlsResponse()
         {
+            OutputScrollId = outputScrollId,
             Urls = urls
         };
     }
@@ -103,10 +104,11 @@ public class TestsService : Service
     public object Post(IndexSearch request)
     {
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
-        var pings = repo.Search(request.Text);
+        var pings = repo.Search(request.Text, out var total);
        
         return new IndexSearchResponse()
         {
+            Total = total,
             Results = pings
                 .Select(x => new SearchResultPoco().PopulateFromPing(x))
                 .ToArray()
