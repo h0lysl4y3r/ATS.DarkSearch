@@ -89,7 +89,23 @@ public class AdminService : Service
         await spider.StartAsync();
         return new HttpResult();
     }
-    
+
+    public object Put(PauseSpider request)
+    {
+        var spider = this.Resolve<Spider>();
+        spider.IsPaused = request.IsPaused;
+        return new HttpResult();
+    }
+
+    public object Get(GetSpiderState request)
+    {
+        var spider = this.Resolve<Spider>();
+        return new GetSpiderStateResponse()
+        {
+            IsPaused = spider.IsPaused
+        };
+    }
+
     public object Delete(PurgeQueues request)
     {
         if (request.TypeFullName.IsNullOrEmpty())
@@ -149,14 +165,16 @@ public class AdminService : Service
         return new HttpResult();
     }
 
-    public object Put(UpdateSinglePing request)
+    public async Task<object> Post(PingSingle request)
     {
         if (request.Url.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.Url));
         
-        PingService.UpdatePing(request.Url);
-        
-        return new HttpResult();
+        var spider = HostContext.Resolve<Spider>();
+            return new PingSingleResponse()
+        {
+            Ping = await spider.Ping(request.Url, true)
+        };
     }
     
     public object Post(RepublishPings request)

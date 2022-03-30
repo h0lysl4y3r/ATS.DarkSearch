@@ -11,11 +11,16 @@ using AngleSharp.Html.Parser;
 using ATS.Common.Extensions;
 using ATS.Common.Helpers;
 using ATS.Common.Poco;
+using ATS.DarkSearch.Model;
+using ATS.DarkSearch.Services;
 using Knapcode.TorSharp;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Net.Http.Headers;
 using Serilog;
+using ServiceStack;
+using ServiceStack.Messaging;
+using ServiceStack.RabbitMq;
 
 namespace ATS.DarkSearch.Workers;
 
@@ -28,6 +33,8 @@ public class Spider : IDisposable
         public string[] Texts { get; set; }
         public string[] Links { get; set; }
     }
+
+    public bool IsPaused { get; set; }
     
     private readonly Microsoft.Extensions.Configuration.IConfiguration _config;
     private readonly IWebHostEnvironment _hostEnvironment;
@@ -297,5 +304,77 @@ public class Spider : IDisposable
         return result.GroupBy(x => x)
             .Select(x => x.Key)
             .ToList();
+    }
+    
+    public async Task<PingResultPoco> Ping(string url, bool publishUpdate)
+    {
+        if (IsPaused)
+        {
+            Log.Warning($"{nameof(PingService)}:{nameof(Ping)} paused but calling ping on " + url);
+            return null;
+        }
+        
+        if (url.IsNullOrEmpty())
+            throw HttpError.BadRequest(nameof(url));
+
+        // Ping
+        PingResultPoco ping = null;
+        try
+        {
+            await StartAsync();
+            ping = await ExecuteAsync(url);
+        }
+        catch
+        {
+            Stop();
+            throw;
+        }
+
+        if (ping == null)
+        {
+            var message = $"{nameof(PingService)}:{nameof(Ping)} no ping result on " + url;
+            Log.Error(message);
+            throw new Exception(message);
+        }
+		
+        // Schedule elastic store
+        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
+
+        Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling store of " + url);
+        mqClient.Publish(new StorePing()
+        {
+            Ping = ping
+        });
+
+        // Try schedule new pings for links
+        if (ping.Links != null && ping.Links.Length > 0)
+        {
+            for (int i = 0; i < ping.Links.Length; i++)
+            {
+                var link = ping.Links[i];
+                Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling new ping for " + link);
+                mqClient.Publish(new Ping()
+                {
+                    Url = link
+                });
+            }
+        }
+		
+        // update ping
+        if (publishUpdate)
+        {
+            var config = HostContext.Resolve<Microsoft.Extensions.Configuration.IConfiguration>();
+            mqClient.PublishDelayed(new Message<UpdatePing>(
+                new UpdatePing()
+                {
+                    Url = ping.Url
+                })
+            {
+                Meta = new Dictionary<string, string>() { { "x-delay", config.GetValue<string>("AppSettings:RefreshPingIntervalMs") } }
+            }, RabbitMqWorker.DelayedMessagesExchange);
+        }
+
+        return ping;
     }
 }

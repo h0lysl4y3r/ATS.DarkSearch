@@ -47,10 +47,15 @@ public class PingAll : IPost
     public string LinkFileName { get; set; }
 }
 
-[Route("/admin/pings", "PUT")]
-public class UpdateSinglePing : IPut
+[Route("/admin/pings", "POST")]
+public class PingSingle : IPost, IReturn<PingSingleResponse>
 {
     public string Url { get; set; }
+}
+
+public class PingSingleResponse
+{
+    public PingResultPoco Ping { get; set; }
 }
 
 [Route("/admin/queues/purge", "DELETE")]
@@ -62,6 +67,22 @@ public class PurgeQueues : IDelete
 [Route("/admin/spider/restart", "PUT")]
 public class RestartSpider : IPut
 {
+}
+
+[Route("/admin/spider/pause", "PUT")]
+public class PauseSpider : IPut
+{
+    public bool IsPaused { get; set; }
+}
+
+[Route("/admin/spider/state", "GET")]
+public class GetSpiderState : IGet, IReturn<GetSpiderStateResponse>
+{
+}
+
+public class GetSpiderStateResponse
+{
+    public bool IsPaused { get; set; }
 }
 
 [Route("/admin/republish/ping", "POST")]

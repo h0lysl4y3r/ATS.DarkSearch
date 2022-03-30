@@ -1,17 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using ATS.Common.Extensions;
-using ATS.Common.Poco;
+﻿using System.Threading.Tasks;
 using ATS.DarkSearch.Model;
 using ATS.DarkSearch.Workers;
-using Microsoft.Extensions.Configuration;
 using Serilog;
 using ServiceStack;
 using ServiceStack.Messaging;
-using ServiceStack.RabbitMq;
-using ServiceStack.Web;
-using RabbitMqWorker = ATS.DarkSearch.Workers.RabbitMqWorker;
 
 namespace ATS.DarkSearch.Services;
 
@@ -19,81 +11,25 @@ public class PingService : Service
 {
 	public async Task<object> Any(Ping request)
 	{
-		return await Ping(Request, request.Url, true);
-	}
+		if (request.Url.IsNullOrEmpty())
+			throw HttpError.BadRequest(nameof(request.Url));
 
-	public static async Task<PingResultPoco> Ping(IRequest request, string url, bool publishUpdate)
-	{
-		if (request == null)
-			throw HttpError.BadRequest(nameof(request));
-		if (url.IsNullOrEmpty())
-			throw HttpError.BadRequest(nameof(url));
-
-		// Ping
-		var spider = request.Resolve<Spider>();
-		PingResultPoco ping = null;
-		try
+		var spider = HostContext.Resolve<Spider>();
+		if (spider.IsPaused)
 		{
-			await spider.StartAsync();
-			ping = await spider.ExecuteAsync(url);
-		}
-		catch
-		{
-			spider.Stop();
-			throw;
-		}
-
-		if (ping == null)
-		{
-			var message = $"{nameof(PingService)}:{nameof(Ping)} no ping result on " + url;
-			Log.Error(message);
-			throw new Exception(message);
+			Log.Debug($"{nameof(PingService)}:{nameof(Ping)} {nameof(Spider)} is paused when pinging " + request.Url);
+			return null;
 		}
 		
-		// Schedule elastic store
-		var mqServer = HostContext.AppHost.Resolve<IMessageService>();
-		using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
-
-		Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling store of " + url);
-		mqClient.Publish(new StorePing()
-		{
-			Ping = ping
-		});
-
-		// Try schedule new pings for links
-		if (ping.Links != null && ping.Links.Length > 0)
-		{
-			for (int i = 0; i < ping.Links.Length; i++)
-			{
-				var link = ping.Links[i];
-				Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling new ping for " + link);
-				mqClient.Publish(new Ping()
-				{
-					Url = link
-				});
-			}
-		}
-		
-		// update ping
-		var config = request.Resolve<IConfiguration>();
-		mqClient.PublishDelayed(new Message<UpdatePing>(
-			new UpdatePing()
-			{
-				Url = ping.Url
-			})
-		{
-			Meta = new Dictionary<string, string>() { { "x-delay", config.GetValue<string>("AppSettings:RefreshPingIntervalMs") } }
-		}, RabbitMqWorker.DelayedMessagesExchange);
-
-		return ping;
+		return await spider.Ping(request.Url, true);
 	}
-
+	
 	public object Any(StorePing request)
 	{
 		if (request.Ping == null)
 			throw HttpError.BadRequest(nameof(request.Ping));
 		
-		var repo = HostContext.AppHost.Resolve<PingsRepository>();
+		var repo = HostContext.Resolve<PingsRepository>();
 		var ping = repo.Get(request.Ping.Url);
 
 		if (ping != null)
@@ -116,7 +52,7 @@ public class PingService : Service
 		if (request.Url.IsNullOrEmpty())
 			throw HttpError.BadRequest(nameof(request.Url));
 		
-		var repo = HostContext.AppHost.Resolve<PingsRepository>();
+		var repo = HostContext.Resolve<PingsRepository>();
 		var ping = repo.Get(request.Url);
 
 		if (ping != null)
@@ -147,7 +83,7 @@ public class PingService : Service
 
 	public static void UpdatePing(string url)
 	{
-		var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+		var mqServer = HostContext.Resolve<IMessageService>();
 		using var mqClient = mqServer.CreateMessageQueueClient();
 
 		Log.Debug($"{nameof(PingService)}:{nameof(UpdatePing)} Update ping of " + url);
