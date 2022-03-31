@@ -1,6 +1,6 @@
-using Serilog;
 using System;
 using System.IO;
+using Serilog;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
 using ServiceStack;

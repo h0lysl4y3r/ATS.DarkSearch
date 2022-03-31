@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using ATS.Common.Auth;
 using ATS.Common.Extensions;
 using ATS.Common.ServiceStack;
 using ATS.DarkSearch.Model;
@@ -19,6 +20,7 @@ namespace ATS.DarkSearch.Services;
 
 public class AdminService : Service
 {
+    [RequiresAccessKey]
     public object Get(GetAllUrls request)
     {
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
@@ -30,6 +32,7 @@ public class AdminService : Service
         };
     }
     
+    [RequiresAccessKey]
     public object Get(GetPing request)
     {
         if (request.Url.IsNullOrEmpty())
@@ -44,6 +47,7 @@ public class AdminService : Service
         };
     }
 
+    [RequiresAccessKey]
     public object Delete(DeletePing request)
     {
         if (request.Url.IsNullOrEmpty())
@@ -56,6 +60,7 @@ public class AdminService : Service
         return new HttpResult();
     }
 
+    [RequiresAccessKey]
     public object Delete(DeleteAllPings request)
     {
         var config = Request.Resolve<IConfiguration>();
@@ -82,6 +87,7 @@ public class AdminService : Service
         return new HttpResult();
     }
 
+    [RequiresAccessKey]
     public async Task<object> Put(RestartSpider request)
     {
         var spider = this.Resolve<Spider>();
@@ -90,6 +96,7 @@ public class AdminService : Service
         return new HttpResult();
     }
 
+    [RequiresAccessKey]
     public object Put(PauseSpider request)
     {
         var spider = this.Resolve<Spider>();
@@ -97,6 +104,7 @@ public class AdminService : Service
         return new HttpResult();
     }
 
+    [RequiresAccessKey]
     public object Get(GetSpiderState request)
     {
         var spider = this.Resolve<Spider>();
@@ -106,6 +114,7 @@ public class AdminService : Service
         };
     }
 
+    [RequiresAccessKey]
     public object Delete(PurgeQueues request)
     {
         if (request.TypeFullName.IsNullOrEmpty())
@@ -121,12 +130,9 @@ public class AdminService : Service
         return new HttpResult();
     }
 
+    [RequiresAccessKey]
     public object Post(PingAll request)
     {
-        var config = Request.Resolve<IConfiguration>();
-        if (request.AccessKey != config.GetValue<string>("AppSettings:AccessKey"))
-            throw HttpError.Forbidden(nameof(request.AccessKey));
-
         if (request.LinkFileName.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.LinkFileName));
 
@@ -146,6 +152,7 @@ public class AdminService : Service
         var mqServer = HostContext.AppHost.Resolve<IMessageService>();
         using var mqClient = mqServer.CreateMessageQueueClient();
 
+        var config = Request.Resolve<IConfiguration>();
         foreach (var link in links)
         {
             var existingPing = repo.Get(link);
@@ -158,13 +165,15 @@ public class AdminService : Service
             Log.Debug($"{nameof(AdminService)}:{nameof(PingAll)} Scheduling ping of " + link);
             mqClient.Publish(new Ping()
             {
-                Url = link
+                Url = link,
+                AccessKey = config.GetValue<string>("AppSettings:AccessKey")
             });
         }
 
         return new HttpResult();
     }
 
+    [RequiresAccessKey]
     public async Task<object> Post(PingSingle request)
     {
         if (request.Url.IsNullOrEmpty())
@@ -177,24 +186,28 @@ public class AdminService : Service
         };
     }
     
+    [RequiresAccessKey]
     public object Post(RepublishPings request)
     {
         Republish<Ping>(request.Count);
         return new HttpResult();
     }
     
+    [RequiresAccessKey]
     public object Post(RepublishPingsStore request)
     {
         Republish<StorePing>(request.Count);
         return new HttpResult();
     }
 
+    [RequiresAccessKey]
     public object Post(RepublishTryNewPing request)
     {
         Republish<TryNewPing>(request.Count);
         return new HttpResult();
     }
 
+    [RequiresAccessKey]
     public object Post(RepublishUpdatePing request)
     {
         Republish<UpdatePing>(request.Count, true);

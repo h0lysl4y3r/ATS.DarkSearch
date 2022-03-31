@@ -1,8 +1,6 @@
 using Funq;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection;
 using ServiceStack;
-using ServiceStack.Admin;
 using ServiceStack.Api.OpenApi;
 
 [assembly: HostingStartup(typeof(ATS.DarkSearch.ATSAppHost))]

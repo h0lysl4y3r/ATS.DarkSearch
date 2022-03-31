@@ -1,4 +1,5 @@
 ﻿using System.Threading.Tasks;
+using ATS.Common.Auth;
 using ATS.DarkSearch.Model;
 using ATS.DarkSearch.Workers;
 using Serilog;
@@ -9,6 +10,7 @@ namespace ATS.DarkSearch.Services;
 
 public class PingService : Service
 {
+	[RequiresAccessKey]
 	public async Task<object> Any(Ping request)
 	{
 		if (request.Url.IsNullOrEmpty())
@@ -24,6 +26,7 @@ public class PingService : Service
 		return await spider.Ping(request.Url, true);
 	}
 	
+	[RequiresAccessKey]
 	public object Any(StorePing request)
 	{
 		if (request.Ping == null)
@@ -47,6 +50,7 @@ public class PingService : Service
 		return new HttpResult();
 	}
 	
+	[RequiresAccessKey]
 	public object Any(TryNewPing request)
 	{
 		if (request.Url.IsNullOrEmpty())
@@ -65,23 +69,25 @@ public class PingService : Service
 		using var mqClient = mqServer.CreateMessageQueueClient();
 		mqClient.Publish(new Ping()
 		{
-			Url = request.Url
+			Url = request.Url,
+			AccessKey = request.AccessKey
 		});
 
 		return new HttpResult();
 	}
 
+	[RequiresAccessKey]
 	public object Any(UpdatePing request)
 	{
 		if (request.Url.IsNullOrEmpty())
 			throw HttpError.BadRequest(nameof(request.Url));
 
-		UpdatePing(request.Url);
+		UpdatePing(request.Url, request.AccessKey);
 
 		return new HttpResult();
 	}
 
-	public static void UpdatePing(string url)
+	public static void UpdatePing(string url, string accessKey)
 	{
 		var mqServer = HostContext.Resolve<IMessageService>();
 		using var mqClient = mqServer.CreateMessageQueueClient();
@@ -90,7 +96,8 @@ public class PingService : Service
         
 		mqClient.Publish(new Ping()
 		{
-			Url = url
+			Url = url,
+			AccessKey = accessKey
 		});
 	}
 }

@@ -341,10 +341,13 @@ public class Spider : IDisposable
         var mqServer = HostContext.AppHost.Resolve<IMessageService>();
         using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
 
+        var accessKey = _config.GetValue<string>("AppSettings:AccessKey");
+
         Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling store of " + url);
         mqClient.Publish(new StorePing()
         {
-            Ping = ping
+            Ping = ping,
+            AccessKey = accessKey
         });
 
         // Try schedule new pings for links
@@ -356,7 +359,8 @@ public class Spider : IDisposable
                 Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling new ping for " + link);
                 mqClient.Publish(new Ping()
                 {
-                    Url = link
+                    Url = link,
+                    AccessKey = accessKey
                 });
             }
         }
@@ -364,14 +368,14 @@ public class Spider : IDisposable
         // update ping
         if (publishUpdate)
         {
-            var config = HostContext.Resolve<Microsoft.Extensions.Configuration.IConfiguration>();
             mqClient.PublishDelayed(new Message<UpdatePing>(
                 new UpdatePing()
                 {
-                    Url = ping.Url
+                    Url = ping.Url,
+                    AccessKey = accessKey
                 })
             {
-                Meta = new Dictionary<string, string>() { { "x-delay", config.GetValue<string>("AppSettings:RefreshPingIntervalMs") } }
+                Meta = new Dictionary<string, string>() { { "x-delay", _config.GetValue<string>("AppSettings:RefreshPingIntervalMs") } }
             }, RabbitMqWorker.DelayedMessagesExchange);
         }
 

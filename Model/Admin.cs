@@ -1,11 +1,11 @@
+using ATS.Common;
 using ATS.Common.Poco;
-using Nest;
 using ServiceStack;
 
 namespace ATS.DarkSearch.Model;
 
 [Route("/admin/urls", "GET")]
-public class GetAllUrls : IGet, IReturn<GetAllUrlsResponse>
+public class GetAllUrls : BaseRequest, IGet, IReturn<GetAllUrlsResponse>
 {
     public string InputScrollId { get; set; }
     public int MaxResults { get; set; }
@@ -18,7 +18,7 @@ public class GetAllUrlsResponse
 }
 
 [Route("/admin/pings", "GET")]
-public class GetPing : IGet, IReturn<GetPingResponse>
+public class GetPing : BaseRequest, IGet, IReturn<GetPingResponse>
 {
     public string Url { get; set; }
 }
@@ -29,26 +29,24 @@ public class GetPingResponse
 }
 
 [Route("/admin/pings", "DELETE")]
-public class DeletePing : IDelete
+public class DeletePing : BaseRequest, IDelete
 {
     public string Url { get; set; }
 }
 
 [Route("/admin/pings/all", "DELETE")]
-public class DeleteAllPings : IDelete
+public class DeleteAllPings : BaseRequest, IDelete
 {
-    public string AccessKey { get; set; }
 }
 
 [Route("/admin/pings/all", "POST")]
-public class PingAll : IPost
+public class PingAll : BaseRequest, IPost
 {
-    public string AccessKey { get; set; }
     public string LinkFileName { get; set; }
 }
 
 [Route("/admin/pings", "POST")]
-public class PingSingle : IPost, IReturn<PingSingleResponse>
+public class PingSingle : BaseRequest, IPost, IReturn<PingSingleResponse>
 {
     public string Url { get; set; }
 }
@@ -59,24 +57,24 @@ public class PingSingleResponse
 }
 
 [Route("/admin/queues/purge", "DELETE")]
-public class PurgeQueues : IDelete
+public class PurgeQueues : BaseRequest, IDelete
 {
     public string TypeFullName { get; set; }
 }
 
 [Route("/admin/spider/restart", "PUT")]
-public class RestartSpider : IPut
+public class RestartSpider : BaseRequest, IPut
 {
 }
 
 [Route("/admin/spider/pause", "PUT")]
-public class PauseSpider : IPut
+public class PauseSpider : BaseRequest, IPut
 {
     public bool IsPaused { get; set; }
 }
 
 [Route("/admin/spider/state", "GET")]
-public class GetSpiderState : IGet, IReturn<GetSpiderStateResponse>
+public class GetSpiderState : BaseRequest, IGet, IReturn<GetSpiderStateResponse>
 {
 }
 
@@ -86,25 +84,25 @@ public class GetSpiderStateResponse
 }
 
 [Route("/admin/republish/ping", "POST")]
-public class RepublishPings : IPost
+public class RepublishPings : BaseRequest, IPost
 {
     public int Count { get; set; } = 10;
 }
 
 [Route("/admin/republish/ping-store", "POST")]
-public class RepublishPingsStore : IPost
+public class RepublishPingsStore : BaseRequest, IPost
 {
     public int Count { get; set; } = 10;
 }
 
 [Route("/admin/republish/try-new-ping", "POST")]
-public class RepublishTryNewPing : IPost
+public class RepublishTryNewPing : BaseRequest, IPost
 {
     public int Count { get; set; } = 10;
 }
 
 [Route("/admin/republish/update-ping", "POST")]
-public class RepublishUpdatePing : IPost
+public class RepublishUpdatePing : BaseRequest, IPost
 {
     public int Count { get; set; } = 10;
 }

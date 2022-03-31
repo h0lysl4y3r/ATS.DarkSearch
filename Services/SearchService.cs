@@ -1,4 +1,6 @@
 using System.Linq;
+using ATS.Common.Auth;
+using ATS.Common.Poco;
 using ATS.DarkSearch.Model;
 using ServiceStack;
 
@@ -6,6 +8,7 @@ namespace ATS.DarkSearch.Services;
 
 public class SearchService : Service
 {
+    [RequiresAccessKey]
     public object Post(Search request)
     {
         if (request.Page < 0)

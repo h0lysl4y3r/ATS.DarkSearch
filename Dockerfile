@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
-LABEL author="Igor Demovic <demovic@atsecurity.net>"
+LABEL maintainer="Igor Demovic <demovic@atsecurity.net>"
 
 WORKDIR ./app
 
 # Copy csproj and restore as distinct layers
 COPY ./*.csproj ./
 # Restore from nuget.org & custom feed with ATS.xxx projects
-RUN dotnet restore -s https://www.myget.org/F/ats/auth/0401e349-75c8-4f9f-a828-5a0f43ec4dcf/api/v3/index.json -s https://api.nuget.org/v3/index.json
+RUN dotnet restore -s https://api.nuget.org/v3/index.json
 
 # Copy everything else and build
 COPY ./ ./
