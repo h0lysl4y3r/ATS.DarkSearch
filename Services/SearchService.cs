@@ -1,7 +1,7 @@
 using System.Linq;
 using ATS.Common.Auth;
+using ATS.Common.Model.DarkSearch;
 using ATS.Common.Poco;
-using ATS.DarkSearch.Model;
 using ServiceStack;
 
 namespace ATS.DarkSearch.Services;

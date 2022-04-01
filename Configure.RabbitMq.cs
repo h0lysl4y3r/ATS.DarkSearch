@@ -1,5 +1,5 @@
+using ATS.Common.Model.DarkSearch;
 using ATS.Common.ServiceStack;
-using ATS.DarkSearch.Model;
 using ATS.DarkSearch.Workers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;

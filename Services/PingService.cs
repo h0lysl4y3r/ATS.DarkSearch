@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 using ATS.Common.Auth;
-using ATS.DarkSearch.Model;
+using ATS.Common.Model.DarkSearch;
 using ATS.DarkSearch.Workers;
 using Serilog;
 using ServiceStack;
