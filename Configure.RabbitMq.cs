@@ -29,12 +29,12 @@ public class ConfigureRabbitMq : IHostingStartup
                 DisablePriorityQueues = true
             };
             appHost.Register<IMessageService>(mqServer);
-
+            
             mqServer.RegisterHandler<Ping>(appHost.ExecuteMessage, 1);
             mqServer.RegisterHandler<TryNewPing>(appHost.ExecuteMessage, 1);
             mqServer.RegisterHandler<StorePing>(appHost.ExecuteMessage, 1);
             mqServer.RegisterHandler<UpdatePing>(appHost.ExecuteMessage, 1, RabbitMqWorker.DelayedMessagesExchange);
-
+            
             // using var mqClient = mqServer.CreateMessageQueueClient();
             // mqClient.Publish(new Hello { Name = "Bugs Bunny" });
         });

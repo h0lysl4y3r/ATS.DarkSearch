@@ -20,7 +20,7 @@ public class ConfigureElastic : IHostingStartup
                 .PrettyJson();
             var client = new ElasticClient(settings);
             services.AddSingleton(client);
-
+            
             if (!client.Indices.Exists(Indices.Parse(PingsRepository.PingsIndex)).Exists)
             {
                 var response = client.Indices.Create(Indices.Index(PingsRepository.PingsIndex),

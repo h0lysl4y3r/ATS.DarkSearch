@@ -17,4 +17,6 @@ RUN dotnet publish -c Release -o out
 FROM mcr.microsoft.com/dotnet/aspnet:6.0 as runtime
 WORKDIR /app
 COPY --from=build /app/out .
+EXPOSE 80
+EXPOSE 443
 ENTRYPOINT ["dotnet", "/app/ATS.DarkSearch.dll", "--environment=Development"]
