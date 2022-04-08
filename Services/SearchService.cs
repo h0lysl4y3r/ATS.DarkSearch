@@ -1,5 +1,6 @@
 using System.Linq;
 using ATS.Common.Auth;
+using ATS.Common.Extensions;
 using ATS.Common.Model.DarkSearch;
 using ATS.Common.Poco;
 using ServiceStack;
