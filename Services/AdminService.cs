@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ATS.Common.Auth;
 using ATS.Common.Extensions;
@@ -92,7 +93,7 @@ public class AdminService : Service
     {
         var spider = this.Resolve<Spider>();
         spider.Stop();
-        await spider.StartAsync();
+        await spider.StartAsync(CancellationToken.None);
         return new HttpResult();
     }
 
