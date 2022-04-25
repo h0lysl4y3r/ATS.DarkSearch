@@ -1,7 +1,9 @@
+using System;
 using Funq;
 using Microsoft.AspNetCore.Hosting;
 using ServiceStack;
 using ServiceStack.Api.OpenApi;
+using ServiceStack.Text;
 
 [assembly: HostingStartup(typeof(ATS.DarkSearch.ATSAppHost))]
 
@@ -25,6 +27,9 @@ public class ATSAppHost : AppHostBase, IHostingStartup
     {
         //Plugins.Add(new AdminUsersFeature());
         Plugins.Add(new OpenApiFeature());
+
+        JsConfig<DateTime>.SerializeFn = dt => dt.ToUnixTime().ToString();
+        JsConfig<DateTimeOffset>.SerializeFn = dt => dt.DateTime.ToUnixTime().ToString();
         
         var hostConfig = new HostConfig
         {
