@@ -1,0 +1,6 @@
+﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=_002Fhome_002Fegor_002Fcode_002FTorSharp_002Fartifacts_002FTorSharp_002FTorSharp_002Fbin_002FDebug_002Fnet6_002E0_002FKnapcode_002ETorSharp_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/AddReferences/RecentPaths/=_002Fhome_002Fegor_002Fcode_002FTorSharp_002Fartifacts_002FTorSharp_002FTorSharp_002Fbin_002FRelease_002Fnet6_002E0_002FKnapcode_002ETorSharp_002Edll/@EntryIndexedValue">True</s:Boolean>
+	<s:String x:Key="/Default/Environment/AssemblyExplorer/XmlDocument/@EntryValue">&lt;AssemblyExplorer&gt;
+  &lt;Assembly Path="/home/egor/.nuget/packages/knapcode.torsharp/2.8.1/lib/netstandard2.0/Knapcode.TorSharp.dll" /&gt;
+&lt;/AssemblyExplorer&gt;</s:String></wpf:ResourceDictionary>

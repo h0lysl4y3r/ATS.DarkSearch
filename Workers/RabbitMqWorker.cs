@@ -11,7 +11,7 @@ namespace ATS.DarkSearch.Workers;
 public class RabbitMqWorker : BackgroundService
 {
     public const string DelayedMessagesExchange = "mx.servicestack.delayed";
-    private const int MqStatsDescriptionDurationMs = 60 * 1000;
+    private const int MqStatsDescriptionDurationMs = 600 * 1000;
     
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

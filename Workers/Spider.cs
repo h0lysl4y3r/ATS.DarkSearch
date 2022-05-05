@@ -11,7 +11,7 @@ using ATS.Common.Extensions;
 using ATS.Common.Helpers;
 using ATS.Common.Model.DarkSearch;
 using ATS.Common.Poco;
-using ATS.Common.Workers;
+using ATS.Common.Tor;
 using ATS.DarkSearch.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;

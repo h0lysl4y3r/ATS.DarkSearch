@@ -28,8 +28,7 @@ public class ATSAppHost : AppHostBase, IHostingStartup
         //Plugins.Add(new AdminUsersFeature());
         Plugins.Add(new OpenApiFeature());
 
-        JsConfig<DateTime>.SerializeFn = dt => dt.ToUnixTime().ToString();
-        JsConfig<DateTimeOffset>.SerializeFn = dt => dt.DateTime.ToUnixTime().ToString();
+        JsConfig.DateHandler = DateHandler.ISO8601;
         
         var hostConfig = new HostConfig
         {

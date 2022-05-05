@@ -13,7 +13,7 @@ try
 		.Enrich.FromLogContext()
 		.WriteTo.Console()
 		.WriteTo.Debug()
-		.WriteTo.File(path: "Logs/log.txt", rollingInterval: RollingInterval.Day)
+		.WriteTo.File(path: "~Logs/log.txt".MapServerPath(), rollingInterval: RollingInterval.Day)
 		.ReadFrom.Configuration(ctx.Configuration)
 	);
 	
