@@ -29,7 +29,7 @@
 
   <ItemGroup>
     <PackageReference Include="AngleSharp" Version="0.16.1" />
-    <PackageReference Include="ATS-Common" Version="0.1.31" />
+    <PackageReference Include="ATS-Common" Version="0.2.0" />
     <PackageReference Include="NEST" Version="7.17.0" />
     <PackageReference Include="RabbitMQ.Client" Version="5.2.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="5.0.0" />
@@ -45,12 +45,6 @@
 
   <ItemGroup>
     <Folder Include="Logs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="Knapcode.TorSharp">
-      <HintPath>..\TorSharp\artifacts\TorSharp\TorSharp\bin\Release\net6.0\Knapcode.TorSharp.dll</HintPath>
-    </Reference>
   </ItemGroup>
 
 </Project>

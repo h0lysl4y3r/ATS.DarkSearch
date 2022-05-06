@@ -5,17 +5,12 @@ using System.Net;
 using ATS.Common;
 using ATS.Common.Auth;
 using ATS.Common.Model;
+using ATS.Common.Model.DarkSearch;
 using Nest;
 using ServiceStack;
 using ServiceStack.Messaging;
 
 namespace ATS.DarkSearch.Services;
-
-public class GetHealthResponse
-{
-    public string ElasticState { get; set; }
-    public string RabbitMqState { get; set; }
-}
 
 [Route("/admin/logs", "GET")]
 public class GetLogs : BaseRequest, IGet, IReturn<string>
