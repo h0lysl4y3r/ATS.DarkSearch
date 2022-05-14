@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <PackageVersion>0.3.0</PackageVersion>
+    <PackageVersion>0.4.3</PackageVersion>
     <Title>ATS.DarkSearch</Title>
     <Authors>ATS</Authors>
-    <AssemblyVersion>0.3.0</AssemblyVersion>
-    <FileVersion>0.3.0</FileVersion>
+    <AssemblyVersion>0.4.3</AssemblyVersion>
+    <FileVersion>0.4.3</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,11 +25,15 @@
     <Content Include="Data\links_test.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <None Remove="Data\links_ransomware.txt" />
+    <Content Include="Data\links_ransomware.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AngleSharp" Version="0.16.1" />
-    <PackageReference Include="ATS-Common" Version="0.2.0" />
+    <PackageReference Include="ATS-Common" Version="0.2.1" />
     <PackageReference Include="NEST" Version="7.17.0" />
     <PackageReference Include="RabbitMQ.Client" Version="5.2.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="5.0.0" />

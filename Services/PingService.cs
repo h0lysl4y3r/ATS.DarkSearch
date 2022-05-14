@@ -11,7 +11,7 @@ namespace ATS.DarkSearch.Services;
 public class PingService : Service
 {
 	[RequiresAccessKey]
-	public async Task<object> Any(Ping request)
+	public async Task Any(Ping request)
 	{
 		if (request.Url.IsNullOrEmpty())
 			throw HttpError.BadRequest(nameof(request.Url));
@@ -20,14 +20,14 @@ public class PingService : Service
 		if (spider.IsPaused)
 		{
 			Log.Debug($"{nameof(PingService)}:{nameof(Ping)} {nameof(Spider)} is paused when pinging " + request.Url);
-			return null;
+			return;
 		}
 		
-		return await spider.Ping(request.Url, true);
+		await spider.Ping(request.Url, true);
 	}
 	
 	[RequiresAccessKey]
-	public object Any(StorePing request)
+	public void Any(StorePing request)
 	{
 		if (request.Ping == null)
 			throw HttpError.BadRequest(nameof(request.Ping));
@@ -46,12 +46,10 @@ public class PingService : Service
 		{
 			repo.Add(request.Ping);
 		}
-
-		return new HttpResult();
 	}
 	
 	[RequiresAccessKey]
-	public object Any(TryNewPing request)
+	public void Any(TryNewPing request)
 	{
 		if (request.Url.IsNullOrEmpty())
 			throw HttpError.BadRequest(nameof(request.Url));
@@ -62,7 +60,7 @@ public class PingService : Service
 		if (ping != null)
 		{
 			Log.Warning($"{nameof(PingService)}:{nameof(TryNewPing)} Ping already stored for " + request.Url);
-			return new HttpResult();
+			return;
 		}
 
 		var mqServer = HostContext.AppHost.Resolve<IMessageService>();
@@ -72,19 +70,15 @@ public class PingService : Service
 			Url = request.Url,
 			AccessKey = request.AccessKey
 		});
-
-		return new HttpResult();
 	}
 
 	[RequiresAccessKey]
-	public object Any(UpdatePing request)
+	public void Any(UpdatePing request)
 	{
 		if (request.Url.IsNullOrEmpty())
 			throw HttpError.BadRequest(nameof(request.Url));
 
 		UpdatePing(request.Url, request.AccessKey);
-
-		return new HttpResult();
 	}
 
 	public static void UpdatePing(string url, string accessKey)

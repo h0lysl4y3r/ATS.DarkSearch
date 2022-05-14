@@ -12,11 +12,6 @@ using ServiceStack.Messaging;
 
 namespace ATS.DarkSearch.Services;
 
-[Route("/admin/logs", "GET")]
-public class GetLogs : BaseRequest, IGet, IReturn<string>
-{
-}
-
 public class CommonService : Service
 {
     [RequiresAccessKey]

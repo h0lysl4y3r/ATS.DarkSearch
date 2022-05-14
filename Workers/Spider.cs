@@ -232,23 +232,24 @@ public class Spider : TorClient
             await StartAsync(CancellationToken.None);
             ping = await ExecuteAsync(url);
         }
-        catch
+        catch (Exception ex)
         {
-            Stop();
+            Log.Debug(ex.Message);
             throw;
         }
+
+        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
 
         if (ping == null)
         {
             var message = $"{nameof(PingService)}:{nameof(Ping)} no ping result on " + url;
             Log.Error(message);
+
             throw new Exception(message);
         }
 		
         // Schedule elastic store
-        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
-        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
-
         var accessKey = _config.GetValue<string>("AppSettings:AccessKey");
 
         Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling store of " + url);
@@ -275,18 +276,22 @@ public class Spider : TorClient
 		
         // update ping
         if (publishUpdate)
-        {
-            mqClient.PublishDelayed(new Message<UpdatePing>(
-                new UpdatePing()
-                {
-                    Url = ping.Url,
-                    AccessKey = accessKey
-                })
-            {
-                Meta = new Dictionary<string, string>() { { "x-delay", _config.GetValue<string>("AppSettings:RefreshPingIntervalMs") } }
-            }, RabbitMqWorker.DelayedMessagesExchange);
-        }
+            PublishPingUpdate(mqClient, ping.Url);
 
         return ping;
+    }
+
+    private void PublishPingUpdate(RabbitMqQueueClient mqClient, string url)
+    {
+        var accessKey = _config.GetValue<string>("AppSettings:AccessKey");
+        mqClient.PublishDelayed(new Message<UpdatePing>(
+            new UpdatePing()
+            {
+                Url = url,
+                AccessKey = accessKey
+            })
+        {
+            Meta = new Dictionary<string, string>() { { "x-delay", _config.GetValue<string>("AppSettings:RefreshPingIntervalMs") } }
+        }, RabbitMqWorker.DelayedMessagesExchange);
     }
 }

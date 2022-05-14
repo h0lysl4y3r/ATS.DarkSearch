@@ -121,7 +121,7 @@ public class AdminService : Service
         if (request.TypeFullName.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.TypeFullName));
 
-        var type = Type.GetType(request.TypeFullName);
+        var type = FindTypeInAllAssembliesByFullName(request.TypeFullName);
         if (type == null)
             throw HttpError.NotFound(nameof(request.TypeFullName));
         
@@ -243,5 +243,15 @@ public class AdminService : Service
                 mqClient.Publish(dlqMsg.GetBody());
             }
         }
+    }
+    
+    private static Type FindTypeInAllAssembliesByFullName(string typeFullName)
+    {
+        if (typeFullName == null)
+            throw new ArgumentNullException(nameof(typeFullName));
+
+        return AppDomain.CurrentDomain.GetAssemblies()
+            .SelectMany(x => x.GetTypes())
+            .FirstOrDefault(x => x.FullName.Equals(typeFullName, StringComparison.InvariantCulture));
     }
 }
