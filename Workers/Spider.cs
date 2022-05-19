@@ -225,6 +225,9 @@ public class Spider : TorClient
         if (url.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(url));
 
+        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
+
         // Ping
         PingResultPoco ping = null;
         try
@@ -235,12 +238,18 @@ public class Spider : TorClient
         catch (Exception ex)
         {
             Log.Debug(ex.Message);
+
+            if (publishUpdate)
+            {
+                PublishPingUpdate(mqClient, url);
+                return null;
+            }
+            
+            // if we don't ping update, let's just re-throw
             throw;
         }
 
-        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
-        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
-
+        // ping will be null if we tried to read a non-html content
         if (ping == null)
         {
             var message = $"{nameof(PingService)}:{nameof(Ping)} no ping result on " + url;

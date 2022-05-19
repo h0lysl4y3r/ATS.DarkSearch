@@ -215,6 +215,12 @@ public class AdminService : Service
         return new HttpResult();
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="count">Max 100</param>
+    /// <param name="delayed"></param>
+    /// <typeparam name="T"></typeparam>
     private void Republish<T>(int count, bool delayed = false)
     {
         var mqServer = HostContext.AppHost.Resolve<IMessageService>();
