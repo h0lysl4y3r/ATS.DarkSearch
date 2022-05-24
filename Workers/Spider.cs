@@ -20,6 +20,7 @@ using Serilog;
 using ServiceStack;
 using ServiceStack.Messaging;
 using ServiceStack.RabbitMq;
+using ServiceStack.Redis;
 
 namespace ATS.DarkSearch.Workers;
 
@@ -34,13 +35,28 @@ public class Spider : TorClient
     }
 
     public bool IsPaused { get; set; }
+    public List<string> Blacklist { get; private set; }
     
     public Spider(Microsoft.Extensions.Configuration.IConfiguration config, 
         IWebHostEnvironment hostEnvironment)
         : base(config, hostEnvironment)
     {
+        Blacklist = config.GetSection("AppSettings:Blacklist").Get<List<string>>();
     }
-    
+
+    public override async Task StartAsync(CancellationToken cancellationToken)
+    {
+        await base.StartAsync(cancellationToken);
+        
+        var clientsManager = HostContext.AppHost.Resolve<IRedisClientsManager>();
+        using var redis = clientsManager.GetClient();
+        var hostEnvironment = HostContext.AppHost.Resolve<IWebHostEnvironment>();
+        var cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
+        var blacklist = redis.Get<List<string>>(cacheKey);
+        if (!blacklist.IsNullOrEmpty())
+            Blacklist.AddRange(blacklist);
+    }
+
     public async Task<PingResultPoco> ExecuteAsync(string url)
     {
         if (url == null)
@@ -57,11 +73,8 @@ public class Spider : TorClient
 
         // document must be of text/html content-type
         var contentType = response.GetHeaderValueSafe(HeaderNames.ContentType);
-        if (contentType == null
-            || !contentType.Contains("text/html"))
-        {
+        if (!contentType.Contains("text/html"))
             return null;
-        }
 
         // create ping result
         var utcNow = DateTimeOffset.UtcNow;
@@ -78,19 +91,26 @@ public class Spider : TorClient
         var statusCode = (int) ping.StatusCode;
         
         // get content if 2xx result code
-        if (statusCode < 300)
+        if (statusCode < 300 || statusCode == 304 /* Not modified */)
         {
             var html = await response.Content.ReadAsStringAsync();
             var textContent = GetTextContent(html);
-            ping.Title = CollapseWhitespace(textContent.Title);
-            ping.Description = CollapseWhitespace(textContent.Description);
-            ping.Texts = textContent.Texts
-                .Select(CollapseWhitespace)
-                .ToArray();
-            ping.IsLive = true;
+            if (textContent != null)
+            {
+                ping.Title = CollapseWhitespace(textContent.Title);
+                ping.Description = CollapseWhitespace(textContent.Description);
+                ping.Texts = textContent.Texts
+                    .Select(CollapseWhitespace)
+                    .ToArray();
+                ping.IsLive = true;
 
-            if (textContent.Links.Length > 0)
-                links = textContent.Links.ToList();
+                if (textContent.Links.Length > 0)
+                    links = textContent.Links.ToList();
+            }
+            else
+            {
+                Log.Warning($"{nameof(Spider)}: No HTML content for " + url);
+            }
         }
         
         // get location if 3xx result code
@@ -222,9 +242,18 @@ public class Spider : TorClient
             return null;
         }
         
-        if (url.IsNullOrEmpty())
+        if (string.IsNullOrEmpty(url))
             throw HttpError.BadRequest(nameof(url));
 
+        Log.Information($"{nameof(PingService)}:{nameof(Ping)} pinging {url}");
+
+        var domain = UriHelpers.GetUriSafe(url).DnsSafeHost;
+        if (Blacklist.Contains(domain))
+        {
+            Log.Warning($"{nameof(PingService)}:{nameof(Ping)} {url} is blacklisted");
+            return null;
+        }
+        
         var mqServer = HostContext.AppHost.Resolve<IMessageService>();
         using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
 
@@ -290,8 +319,10 @@ public class Spider : TorClient
         return ping;
     }
 
-    private void PublishPingUpdate(RabbitMqQueueClient mqClient, string url)
+    public void PublishPingUpdate(RabbitMqQueueClient mqClient, string url)
     {
+        Log.Debug($"{nameof(PingService)}:{nameof(PublishPingUpdate)} Publishing update of " + url);
+        
         var accessKey = _config.GetValue<string>("AppSettings:AccessKey");
         mqClient.PublishDelayed(new Message<UpdatePing>(
             new UpdatePing()
@@ -302,5 +333,27 @@ public class Spider : TorClient
         {
             Meta = new Dictionary<string, string>() { { "x-delay", _config.GetValue<string>("AppSettings:RefreshPingIntervalMs") } }
         }, RabbitMqWorker.DelayedMessagesExchange);
+    }
+
+    public bool AddOrRemoveToBlacklist(string domain, bool add)
+    {
+        if (domain == null)
+            throw new ArgumentNullException(nameof(domain));
+
+        var url = UriHelpers.SanitizeUrlScheme(domain);
+        if (UriHelpers.GetUriSafe(url) == null)
+            throw new ArgumentException(nameof(domain));
+
+        var clientsManager = HostContext.AppHost.Resolve<IRedisClientsManager>();
+        using var redis = clientsManager.GetClient();
+        var hostEnvironment = HostContext.AppHost.Resolve<IWebHostEnvironment>();
+        var cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
+
+        if (add)
+            Blacklist.Add(domain);
+        else
+            Blacklist.Remove(domain);
+        
+        return redis.Set(cacheKey, Blacklist);
     }
 }

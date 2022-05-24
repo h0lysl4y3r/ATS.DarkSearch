@@ -39,7 +39,7 @@ public class PingsRepository
         return response.Documents;
     }
 
-    public string[] GetUrls(string inputScrollId, out string outputScrollId, int maxResults = 1000)
+    public string[] GetUrls(string inputScrollId, out string outputScrollId, int maxResults)
     {
         if (maxResults <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxResults));

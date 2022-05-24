@@ -21,7 +21,7 @@ public class RabbitMqWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            Log.Information("MQ Worker running at: {stats}", mqServer.GetStatsDescription());
+            //Log.Information("MQ Worker running at: {stats}", mqServer.GetStatsDescription());
             await Task.Delay(MqStatsDescriptionDurationMs, stoppingToken);
         }
 

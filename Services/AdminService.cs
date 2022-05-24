@@ -4,8 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ATS.Common;
 using ATS.Common.Auth;
 using ATS.Common.Extensions;
+using ATS.Common.Helpers;
 using ATS.Common.Model.DarkSearch;
 using ATS.Common.ServiceStack;
 using ATS.DarkSearch.Workers;
@@ -19,12 +21,30 @@ using RabbitMqWorker = ATS.DarkSearch.Workers.RabbitMqWorker;
 
 namespace ATS.DarkSearch.Services;
 
+[Route("/admin/blacklist", "POST")]
+public class AddOrRemoveToBlacklist : BaseRequest, IPost, IReturn
+{
+    public string Domain { get; set; }
+    public bool Add { get; set; }
+}
+
 public class AdminService : Service
 {
+    [RequiresAccessKey]
+    public object Post(AddOrRemoveToBlacklist request)
+    {
+        var spider = HostContext.AppHost.Resolve<Spider>();
+        if (!spider.AddOrRemoveToBlacklist(request.Domain, request.Add))
+            throw HttpError.ServiceUnavailable(nameof(request.Domain));
+        
+        return new HttpResult();
+    }
+
     [RequiresAccessKey]
     public object Get(GetAllUrls request)
     {
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
+        var maxResults = Math.Min(request.MaxResults, 1000);
         var urls = repo.GetUrls(request.InputScrollId, out var outputScrollId, request.MaxResults);
         return new GetAllUrlsResponse()
         {
@@ -32,7 +52,25 @@ public class AdminService : Service
             Urls = urls
         };
     }
-    
+
+    [RequiresAccessKey]
+    public object Get(DumpAllUrls request)
+    {
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
+
+        var dumpPath = $"~/Data/dump_{DateTimeOffset.UtcNow.ToString("yyMMdd_hhmmss")}.txt".MapServerPath();
+        Task.Run(() =>
+        {
+            var urls = repo.GetUrls(null, out var outputScrollId, 1000 * 1000 * 1000)
+                .ToList();
+            urls.Insert(0, urls.Count.ToString());
+        
+            File.WriteAllLines(dumpPath, urls);
+        });
+        
+        return dumpPath;
+    }
+
     [RequiresAccessKey]
     public object Get(GetPing request)
     {
@@ -64,16 +102,12 @@ public class AdminService : Service
     [RequiresAccessKey]
     public object Delete(DeleteAllPings request)
     {
-        var config = Request.Resolve<IConfiguration>();
-        if (request.AccessKey != config.GetValue<string>("AppSettings:AccessKey"))
-            throw HttpError.Forbidden(nameof(request.AccessKey));
-        
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
 
         string inputScrollId = null;
         while (true)
         {
-            var urls = repo.GetUrls(inputScrollId, out var outputScrollId);
+            var urls = repo.GetUrls(inputScrollId, out var outputScrollId, 1000);
             if (urls.Length == 0)
                 break;
 
@@ -84,6 +118,63 @@ public class AdminService : Service
                     throw HttpError.ServiceUnavailable(url);
             }
         }
+        
+        return new HttpResult();
+    }
+
+    [RequiresAccessKey]
+    public object Put(ArchivePings request)
+    {
+        if (request.Domain.IsNullOrEmpty())
+            throw HttpError.BadRequest(nameof(request.Domain));
+        
+        var spider = HostContext.AppHost.Resolve<Spider>();
+        spider.Blacklist.Add(request.Domain);
+
+        Task.Run(() =>
+        {
+            var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+            using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
+
+            var count = 0;
+            var archived = new List<string>();
+
+            while (true)
+            {
+                if (count % (100 * 1000) == 0 && count > 0)
+                {
+                    if (archived.Count > 0)
+                    {
+                        IOHelpers.EnsureDirectory($"~/Data/archived/{request.Domain}".MapServerPath());
+                        var dumpPath = $"~/Data/archived/{request.Domain}/{DateTimeOffset.UtcNow.ToString("yyMMdd_hhmmss")}.txt".MapServerPath();
+                        File.WriteAllLines(dumpPath, archived);
+                        Log.Debug($"{nameof(ArchivePings)}: archived " + archived.Count + " into " + dumpPath);
+                        archived.Clear();
+                    }
+                }
+                count++;
+
+                var message = mqClient.Get<Ping>(QueueNames<Ping>.In);
+                if (message == null)
+                    break;
+            
+                mqClient.Ack(message);
+                var ping = message.GetBody();
+                if (ping == null)
+                    continue;
+
+                if (ping.Url.Contains(request.Domain))
+                {
+                    archived.Add(ping.Url);
+                    continue;
+                }
+
+                spider.PublishPingUpdate(mqClient, ping.Url);
+            }
+
+            spider.Blacklist.Remove(request.Domain);
+            Log.Debug($"{nameof(ArchivePings)}: archiving finished");
+        });
         
         return new HttpResult();
     }
@@ -156,13 +247,16 @@ public class AdminService : Service
         var config = Request.Resolve<IConfiguration>();
         foreach (var link in links)
         {
-            var existingPing = repo.Get(link);
-            if (existingPing != null)
-            {
-                Log.Debug($"{nameof(AdminService)}:{nameof(PingAll)} Skipping, ping of " + link + " exists");
-                continue;
+            if (!request.PingOnExists)
+            {            
+                var existingPing = repo.Get(link);
+                if (existingPing != null)
+                {
+                    Log.Debug($"{nameof(AdminService)}:{nameof(PingAll)} Skipping, ping of " + link + " exists");
+                    continue;
+                }
             }
-
+            
             Log.Debug($"{nameof(AdminService)}:{nameof(PingAll)} Scheduling ping of " + link);
             mqClient.Publish(new Ping()
             {
@@ -186,7 +280,22 @@ public class AdminService : Service
             Ping = await spider.Ping(request.Url, true)
         };
     }
-    
+
+    [RequiresAccessKey]
+    public object PUt(UpdatePingSingle request)
+    {
+        if (request.Url.IsNullOrEmpty())
+            throw HttpError.BadRequest(nameof(request.Url));
+        
+        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
+
+        var spider = HostContext.Resolve<Spider>();
+        spider.PublishPingUpdate(mqClient, request.Url);
+
+        return new HttpResult();
+    }
+
     [RequiresAccessKey]
     public object Post(RepublishPings request)
     {

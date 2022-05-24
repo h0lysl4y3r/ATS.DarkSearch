@@ -1,8 +1,11 @@
+using System.Collections.Generic;
 using ATS.Common.Model.DarkSearch;
 using ATS.Common.ServiceStack;
 using ATS.DarkSearch.Workers;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Nest;
 using ServiceStack;
 using ServiceStack.Messaging;
 using RabbitMqWorker = ATS.DarkSearch.Workers.RabbitMqWorker;
