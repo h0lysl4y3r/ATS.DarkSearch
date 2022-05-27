@@ -11,12 +11,16 @@ RUN dotnet restore -s https://api.nuget.org/v3/index.json
 
 # Copy everything else and build
 COPY ./ ./
-RUN dotnet publish -c Release -o out
+RUN dotnet publish -c Release -o build
 
 # Build runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:6.0 as runtime
 WORKDIR /app
-COPY --from=build /app/out .
+COPY --from=build /app/build .
+
+RUN mkdir -p /app/out
+
 EXPOSE 80
 EXPOSE 443
+
 ENTRYPOINT ["dotnet", "/app/ATS.DarkSearch.dll", "--environment=Staging"]

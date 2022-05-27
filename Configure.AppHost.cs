@@ -1,7 +1,6 @@
-using System;
-using System.Linq;
 using Funq;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using ServiceStack;
 using ServiceStack.Api.OpenApi;
 using ServiceStack.Text;
@@ -14,6 +13,7 @@ public class ATSAppHost : AppHostBase, IHostingStartup
 {
     public void Configure(IWebHostBuilder builder) => builder
         .ConfigureServices(services => {
+            services.AddSingleton<PingStats>();
         })
         .Configure(app => {
             if (!HasInit)

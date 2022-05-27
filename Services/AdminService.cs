@@ -21,11 +21,31 @@ using RabbitMqWorker = ATS.DarkSearch.Workers.RabbitMqWorker;
 
 namespace ATS.DarkSearch.Services;
 
-[Route("/admin/blacklist", "POST")]
-public class AddOrRemoveToBlacklist : BaseRequest, IPost, IReturn
+[Route("/admin/stats", "GET")]
+public class GetPingStats : BaseRequest, IGet, IReturn<GetPingStatsResponse>
 {
-    public string Domain { get; set; }
-    public bool Add { get; set; }
+    public long HourTicks { get; set; }
+}
+
+public class GetPingStatsResponse
+{
+    public int Ok1h { get; set; }
+    public int Blacklisted1h { get; set; }
+    public int Thorttled1h { get; set; }
+    public int Paused1h { get; set; }
+    public int Ok24h { get; set; }
+    public int Blacklisted24h { get; set; }
+    public int Thorttled24h { get; set; }
+    public int Paused24h { get; set; }
+    public int Ok72h { get; set; }
+    public int Blacklisted72h { get; set; }
+    public int Thorttled72h { get; set; }
+    public int Paused72h { get; set; }
+}
+
+[Route("/admin/ticks/utcnow", "GET")]
+public class GetUtcNowTicks : IGet, IReturn<long>
+{
 }
 
 public class AdminService : Service
@@ -58,7 +78,7 @@ public class AdminService : Service
     {
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
 
-        var dumpPath = $"~/Data/dump_{DateTimeOffset.UtcNow.ToString("yyMMdd_hhmmss")}.txt".MapServerPath();
+        var dumpPath = $"~/out/dump_{DateTimeOffset.UtcNow.ToString("yyMMdd_hhmmss")}.txt".MapServerPath();
         Task.Run(() =>
         {
             var urls = repo.GetUrls(null, out var outputScrollId, 1000 * 1000 * 1000)
@@ -145,8 +165,8 @@ public class AdminService : Service
                 {
                     if (archived.Count > 0)
                     {
-                        IOHelpers.EnsureDirectory($"~/Data/archived/{request.Domain}".MapServerPath());
-                        var dumpPath = $"~/Data/archived/{request.Domain}/{DateTimeOffset.UtcNow.ToString("yyMMdd_hhmmss")}.txt".MapServerPath();
+                        IOHelpers.EnsureDirectory($"~/out/archived/{request.Domain}".MapServerPath());
+                        var dumpPath = $"~/out/archived/{request.Domain}/{DateTimeOffset.UtcNow.ToString("yyMMdd_hhmmss")}.txt".MapServerPath();
                         File.WriteAllLines(dumpPath, archived);
                         Log.Debug($"{nameof(ArchivePings)}: archived " + archived.Count + " into " + dumpPath);
                         archived.Clear();
@@ -324,6 +344,39 @@ public class AdminService : Service
         return new HttpResult();
     }
 
+    [RequiresAccessKey]
+    public object Get(GetPingStats request)
+    {
+        var pingStats = HostContext.AppHost.Resolve<PingStats>();
+        var now = new DateTimeOffset(request.HourTicks, TimeSpan.Zero);
+        var minus1h = now.AddHours(-1);
+        var minus24h = now.AddDays(-1);
+        var minus72h = now.AddDays(-3);
+        
+        return new GetPingStatsResponse()
+        {
+            Ok1h = pingStats.Get(minus1h, PingStats.PingState.Ok),
+            Blacklisted1h = pingStats.Get(minus1h, PingStats.PingState.Blacklisted),
+            Thorttled1h = pingStats.Get(minus1h, PingStats.PingState.Throttled),
+            Paused1h = pingStats.Get(minus1h, PingStats.PingState.Paused),
+            Ok24h = pingStats.Get(minus24h, PingStats.PingState.Ok),
+            Blacklisted24h = pingStats.Get(minus24h, PingStats.PingState.Blacklisted),
+            Thorttled24h = pingStats.Get(minus24h, PingStats.PingState.Throttled),
+            Paused24h = pingStats.Get(minus24h, PingStats.PingState.Paused),
+            Ok72h = pingStats.Get(minus72h, PingStats.PingState.Ok),
+            Blacklisted72h = pingStats.Get(minus72h, PingStats.PingState.Blacklisted),
+            Thorttled72h = pingStats.Get(minus72h, PingStats.PingState.Throttled),
+            Paused72h = pingStats.Get(minus72h, PingStats.PingState.Paused),
+        };
+    }
+
+    public object Get(GetUtcNowTicks request)
+    {
+        var utcNow = DateTimeOffset.UtcNow;
+        var now = new DateTime(utcNow.Year, utcNow.Month, utcNow.Day, utcNow.Hour, 0, 0);
+        return now.Ticks;
+    }
+    
     /// <summary>
     /// 
     /// </summary>

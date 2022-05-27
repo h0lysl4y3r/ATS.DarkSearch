@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using AngleSharp;
@@ -36,6 +37,7 @@ public class Spider : TorClient
 
     public bool IsPaused { get; set; }
     public List<string> Blacklist { get; private set; }
+    public Dictionary<string, int> PingMap { get; private set; } = new Dictionary<string, int>();
     
     public Spider(Microsoft.Extensions.Configuration.IConfiguration config, 
         IWebHostEnvironment hostEnvironment)
@@ -51,10 +53,15 @@ public class Spider : TorClient
         var clientsManager = HostContext.AppHost.Resolve<IRedisClientsManager>();
         using var redis = clientsManager.GetClient();
         var hostEnvironment = HostContext.AppHost.Resolve<IWebHostEnvironment>();
+        
         var cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
         var blacklist = redis.Get<List<string>>(cacheKey);
         if (!blacklist.IsNullOrEmpty())
             Blacklist.AddRange(blacklist);
+        
+        cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:PingMap";
+        var pingMap = redis.Get<Dictionary<string, int>>(cacheKey);
+        PingMap = pingMap ?? new Dictionary<string, int>();
     }
 
     public async Task<PingResultPoco> ExecuteAsync(string url)
@@ -236,26 +243,42 @@ public class Spider : TorClient
     
     public async Task<PingResultPoco> Ping(string url, bool publishUpdate)
     {
-        if (IsPaused)
-        {
-            Log.Warning($"{nameof(PingService)}:{nameof(Ping)} paused but calling ping on " + url);
-            return null;
-        }
-        
         if (string.IsNullOrEmpty(url))
             throw HttpError.BadRequest(nameof(url));
 
+        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
+
+        var pingStats = HostContext.AppHost.Resolve<PingStats>();
+
+        if (IsPaused)
+        {
+            Log.Warning($"{nameof(PingService)}:{nameof(Ping)} paused but calling ping on " + url);
+            if (publishUpdate)
+                PublishPingUpdate(mqClient, url);
+            
+            pingStats.Update(url, PingStats.PingState.Paused);
+            return null;
+        }
+        
         Log.Information($"{nameof(PingService)}:{nameof(Ping)} pinging {url}");
 
         var domain = UriHelpers.GetUriSafe(url).DnsSafeHost;
         if (Blacklist.Contains(domain))
         {
             Log.Warning($"{nameof(PingService)}:{nameof(Ping)} {url} is blacklisted");
+            pingStats.Update(url, PingStats.PingState.Blacklisted);
             return null;
         }
-        
-        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
-        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
+
+        if (ThrottlePing(domain))
+        {
+            Log.Warning($"{nameof(PingService)}:{nameof(Ping)} {url} is throttled");
+            pingStats.Update(url, PingStats.PingState.Throttled);
+            return null;
+        }
+
+        pingStats.Update(url, PingStats.PingState.Ok);
 
         // Ping
         PingResultPoco ping = null;
@@ -323,6 +346,10 @@ public class Spider : TorClient
     {
         Log.Debug($"{nameof(PingService)}:{nameof(PublishPingUpdate)} Publishing update of " + url);
         
+        var delayStr = _config.GetValue<string>("AppSettings:RefreshPingIntervalMs");
+        var delay = long.Parse(delayStr);
+        delay = delay + RandomNumberGenerator.GetInt32(0, 86400000); // plus random 0-1 day
+        
         var accessKey = _config.GetValue<string>("AppSettings:AccessKey");
         mqClient.PublishDelayed(new Message<UpdatePing>(
             new UpdatePing()
@@ -331,7 +358,7 @@ public class Spider : TorClient
                 AccessKey = accessKey
             })
         {
-            Meta = new Dictionary<string, string>() { { "x-delay", _config.GetValue<string>("AppSettings:RefreshPingIntervalMs") } }
+            Meta = new Dictionary<string, string>() { { "x-delay", delay.ToString() } }
         }, RabbitMqWorker.DelayedMessagesExchange);
     }
 
@@ -355,5 +382,25 @@ public class Spider : TorClient
             Blacklist.Remove(domain);
         
         return redis.Set(cacheKey, Blacklist);
+    }
+
+    private bool ThrottlePing(string domain)
+    {
+        if (domain == null)
+            throw new ArgumentNullException(nameof(domain));
+
+        if (!PingMap.ContainsKey(domain)) PingMap[domain] = 0;
+        PingMap[domain]++;
+
+        if (PingMap[domain] % 10 == 0)
+        {
+            var clientsManager = HostContext.AppHost.Resolve<IRedisClientsManager>();
+            using var redis = clientsManager.GetClient();
+
+            var cacheKey = $"ATS.DarkSearch:{_hostEnvironment.EnvironmentName}:{nameof(Spider)}:PingMap";
+            redis.Set(cacheKey, PingMap);
+        }
+
+        return PingMap[domain] > 1000;
     }
 }
