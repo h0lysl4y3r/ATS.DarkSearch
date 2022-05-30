@@ -57,7 +57,13 @@ public class Spider : TorClient
         var cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
         var blacklist = redis.Get<List<string>>(cacheKey);
         if (!blacklist.IsNullOrEmpty())
-            Blacklist.AddRange(blacklist);
+        {
+            foreach (var item in blacklist)
+            {
+                if (!Blacklist.Contains(item))
+                    Blacklist.AddRange(blacklist);
+            }
+        }
         
         cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:PingMap";
         var pingMap = redis.Get<Dictionary<string, int>>(cacheKey);
@@ -253,7 +259,7 @@ public class Spider : TorClient
 
         if (IsPaused)
         {
-            Log.Warning($"{nameof(PingService)}:{nameof(Ping)} paused but calling ping on " + url);
+            Log.Warning($"{nameof(Spider)}:{nameof(Ping)} paused but calling ping on " + url);
             if (publishUpdate)
                 PublishPingUpdate(mqClient, url);
             
@@ -261,22 +267,10 @@ public class Spider : TorClient
             return null;
         }
         
-        Log.Information($"{nameof(PingService)}:{nameof(Ping)} pinging {url}");
+        Log.Information($"{nameof(Spider)}:{nameof(Ping)} pinging {url}");
 
-        var domain = UriHelpers.GetUriSafe(url).DnsSafeHost;
-        if (Blacklist.Contains(domain))
-        {
-            Log.Warning($"{nameof(PingService)}:{nameof(Ping)} {url} is blacklisted");
-            pingStats.Update(url, PingStats.PingState.Blacklisted);
+        if (IsThrottledOrBlacklisted(url, true))
             return null;
-        }
-
-        if (ThrottlePing(domain))
-        {
-            Log.Warning($"{nameof(PingService)}:{nameof(Ping)} {url} is throttled");
-            pingStats.Update(url, PingStats.PingState.Throttled);
-            return null;
-        }
 
         pingStats.Update(url, PingStats.PingState.Ok);
 
@@ -304,7 +298,7 @@ public class Spider : TorClient
         // ping will be null if we tried to read a non-html content
         if (ping == null)
         {
-            var message = $"{nameof(PingService)}:{nameof(Ping)} no ping result on " + url;
+            var message = $"{nameof(Spider)}:{nameof(Ping)} no ping result on " + url;
             Log.Error(message);
 
             throw new Exception(message);
@@ -313,7 +307,7 @@ public class Spider : TorClient
         // Schedule elastic store
         var accessKey = _config.GetValue<string>("AppSettings:AccessKey");
 
-        Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling store of " + url);
+        Log.Debug($"{nameof(Spider)}:{nameof(Ping)} Scheduling store of " + url);
         mqClient.Publish(new StorePing()
         {
             Ping = ping,
@@ -326,7 +320,7 @@ public class Spider : TorClient
             for (int i = 0; i < ping.Links.Length; i++)
             {
                 var link = ping.Links[i];
-                Log.Debug($"{nameof(PingService)}:{nameof(Ping)} Scheduling new ping for " + link);
+                Log.Debug($"{nameof(Spider)}:{nameof(Ping)} Scheduling new ping for " + link);
                 mqClient.Publish(new Ping()
                 {
                     Url = link,
@@ -340,6 +334,41 @@ public class Spider : TorClient
             PublishPingUpdate(mqClient, ping.Url);
 
         return ping;
+    }
+
+    public bool IsThrottledOrBlacklisted(string url, bool updateStats)
+    {
+        if (url == null)
+            throw new ArgumentNullException(nameof(url));
+
+        var pingStats = HostContext.AppHost.Resolve<PingStats>();
+
+        var tld = GetLeftOf(UriHelpers.GetUriSafe(url).DnsSafeHost, "onion", ".");
+        if (tld == null)
+        {
+            Log.Warning($"{nameof(Spider)}:{nameof(Ping)} {url} is no onion site");
+            if (updateStats)
+                pingStats.Update(url, PingStats.PingState.Blacklisted);
+            return true;
+        }
+        
+        if (Blacklist.Any(x => x.Contains(tld)))
+        {
+            Log.Warning($"{nameof(Spider)}:{nameof(Ping)} {url} is blacklisted");
+            if (updateStats)
+                pingStats.Update(url, PingStats.PingState.Blacklisted);
+            return true;
+        }
+
+        if (ThrottlePing(tld))
+        {
+            Log.Warning($"{nameof(Spider)}:{nameof(Ping)} {url} is throttled");
+            if (updateStats)
+                pingStats.Update(url, PingStats.PingState.Throttled);
+            return true;
+        }
+
+        return false;
     }
 
     public void PublishPingUpdate(RabbitMqQueueClient mqClient, string url)
@@ -377,9 +406,17 @@ public class Spider : TorClient
         var cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
 
         if (add)
+        {
+            if (Blacklist.Contains(domain))
+                return true;
             Blacklist.Add(domain);
+        }
         else
+        {
+            if (!Blacklist.Contains(domain))
+                return true;
             Blacklist.Remove(domain);
+        }
         
         return redis.Set(cacheKey, Blacklist);
     }
@@ -402,5 +439,26 @@ public class Spider : TorClient
         }
 
         return PingMap[domain] > 1000;
+    }
+    
+    static string? GetLeftOf(string text, string leftOf, string separator)
+    {
+        if (text == null)
+            throw new ArgumentNullException(nameof(text));
+        if (leftOf == null)
+            throw new ArgumentNullException(nameof(leftOf));
+        if (separator == null)
+            throw new ArgumentNullException(nameof(separator));
+
+        string?[] split = text.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < split.Length; i++)
+        {
+            if (split[i] == null || !split[i].Equals(leftOf, StringComparison.InvariantCultureIgnoreCase))
+                continue;
+
+            return i == 0 ? null : split[i - 1];
+        }
+
+        return null;
     }
 }

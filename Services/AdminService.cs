@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using ATS.Common;
 using ATS.Common.Auth;
 using ATS.Common.Extensions;
 using ATS.Common.Helpers;
@@ -20,33 +19,6 @@ using ServiceStack.RabbitMq;
 using RabbitMqWorker = ATS.DarkSearch.Workers.RabbitMqWorker;
 
 namespace ATS.DarkSearch.Services;
-
-[Route("/admin/stats", "GET")]
-public class GetPingStats : BaseRequest, IGet, IReturn<GetPingStatsResponse>
-{
-    public long HourTicks { get; set; }
-}
-
-public class GetPingStatsResponse
-{
-    public int Ok1h { get; set; }
-    public int Blacklisted1h { get; set; }
-    public int Thorttled1h { get; set; }
-    public int Paused1h { get; set; }
-    public int Ok24h { get; set; }
-    public int Blacklisted24h { get; set; }
-    public int Thorttled24h { get; set; }
-    public int Paused24h { get; set; }
-    public int Ok72h { get; set; }
-    public int Blacklisted72h { get; set; }
-    public int Thorttled72h { get; set; }
-    public int Paused72h { get; set; }
-}
-
-[Route("/admin/ticks/utcnow", "GET")]
-public class GetUtcNowTicks : IGet, IReturn<long>
-{
-}
 
 public class AdminService : Service
 {
@@ -149,7 +121,6 @@ public class AdminService : Service
             throw HttpError.BadRequest(nameof(request.Domain));
         
         var spider = HostContext.AppHost.Resolve<Spider>();
-        spider.Blacklist.Add(request.Domain);
 
         Task.Run(() =>
         {
@@ -189,10 +160,10 @@ public class AdminService : Service
                     continue;
                 }
 
-                spider.PublishPingUpdate(mqClient, ping.Url);
+                if (!spider.IsThrottledOrBlacklisted(ping.Url, false))
+                    spider.PublishPingUpdate(mqClient, ping.Url);
             }
 
-            spider.Blacklist.Remove(request.Domain);
             Log.Debug($"{nameof(ArchivePings)}: archiving finished");
         });
         
@@ -349,23 +320,22 @@ public class AdminService : Service
     {
         var pingStats = HostContext.AppHost.Resolve<PingStats>();
         var now = new DateTimeOffset(request.HourTicks, TimeSpan.Zero);
-        var minus1h = now.AddHours(-1);
         var minus24h = now.AddDays(-1);
         var minus72h = now.AddDays(-3);
         
         return new GetPingStatsResponse()
         {
-            Ok1h = pingStats.Get(minus1h, PingStats.PingState.Ok),
-            Blacklisted1h = pingStats.Get(minus1h, PingStats.PingState.Blacklisted),
-            Thorttled1h = pingStats.Get(minus1h, PingStats.PingState.Throttled),
-            Paused1h = pingStats.Get(minus1h, PingStats.PingState.Paused),
+            Ok1h = pingStats.Get(now, PingStats.PingState.Ok),
+            Blacklisted1h = pingStats.Get(now, PingStats.PingState.Blacklisted),
+            Throttled1h = pingStats.Get(now, PingStats.PingState.Throttled),
+            Paused1h = pingStats.Get(now, PingStats.PingState.Paused),
             Ok24h = pingStats.Get(minus24h, PingStats.PingState.Ok),
             Blacklisted24h = pingStats.Get(minus24h, PingStats.PingState.Blacklisted),
-            Thorttled24h = pingStats.Get(minus24h, PingStats.PingState.Throttled),
+            Throttled24h = pingStats.Get(minus24h, PingStats.PingState.Throttled),
             Paused24h = pingStats.Get(minus24h, PingStats.PingState.Paused),
             Ok72h = pingStats.Get(minus72h, PingStats.PingState.Ok),
             Blacklisted72h = pingStats.Get(minus72h, PingStats.PingState.Blacklisted),
-            Thorttled72h = pingStats.Get(minus72h, PingStats.PingState.Throttled),
+            Throttled72h = pingStats.Get(minus72h, PingStats.PingState.Throttled),
             Paused72h = pingStats.Get(minus72h, PingStats.PingState.Paused),
         };
     }
@@ -376,7 +346,21 @@ public class AdminService : Service
         var now = new DateTime(utcNow.Year, utcNow.Month, utcNow.Day, utcNow.Hour, 0, 0);
         return now.Ticks;
     }
-    
+
+    [RequiresAccessKey]
+    public object Get(GetPingStatsBlacklisted request)
+    {
+        var spider = HostContext.AppHost.Resolve<Spider>();
+        return spider.Blacklist;
+    }    
+
+    [RequiresAccessKey]
+    public object Get(GetPingStatsThrottled request)
+    {
+        var spider = HostContext.AppHost.Resolve<Spider>();
+        return spider.PingMap.Keys.ToList();
+    }    
+
     /// <summary>
     /// 
     /// </summary>
