@@ -361,40 +361,40 @@ public class AdminService : Service
         return spider.PingMap.Keys.ToList();
     }    
 
-    /// <summary>
-    /// 
-    /// </summary>
-    /// <param name="count">Max 100</param>
-    /// <param name="delayed"></param>
-    /// <typeparam name="T"></typeparam>
     private void Republish<T>(int count, bool delayed = false)
     {
-        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
-        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
+        if (count <= 0)
+            throw new ArgumentOutOfRangeException(nameof(count));
 
-        count = Math.Clamp(count, 1, 100);
-        for (int i = 0; i < count; i++)
+        var config = Request.Resolve<IConfiguration>();
+        
+        Task.Run(() =>
         {
-            IMessage<T> dlqMsg = mqClient.Get<T>(QueueNames<T>.Dlq);
-            if (dlqMsg == null)
-                break;
+            var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+            using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
+
+            for (int i = 0; i < count; i++)
+            {
+                IMessage<T> dlqMsg = mqClient.Get<T>(QueueNames<T>.Dlq);
+                if (dlqMsg == null)
+                    break;
             
-            mqClient.Ack(dlqMsg);
-            if (delayed)
-            {
-                var config = Request.Resolve<IConfiguration>();
-                var message = MessageFactory.Create(dlqMsg.GetBody());
-                message.Meta = new Dictionary<string, string>()
+                mqClient.Ack(dlqMsg);
+                if (delayed)
                 {
-                    {"x-delay", config.GetValue<string>("AppSettings:RefreshPingIntervalMs")}
-                };
-                mqClient.PublishDelayed(message, RabbitMqWorker.DelayedMessagesExchange);
+                    var message = MessageFactory.Create(dlqMsg.GetBody());
+                    message.Meta = new Dictionary<string, string>()
+                    {
+                        {"x-delay", config.GetValue<string>("AppSettings:RefreshPingIntervalMs")}
+                    };
+                    mqClient.PublishDelayed(message, RabbitMqWorker.DelayedMessagesExchange);
+                }
+                else
+                {
+                    mqClient.Publish(dlqMsg.GetBody());
+                }
             }
-            else
-            {
-                mqClient.Publish(dlqMsg.GetBody());
-            }
-        }
+        });
     }
     
     private static Type FindTypeInAllAssembliesByFullName(string typeFullName)

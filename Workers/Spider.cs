@@ -441,7 +441,7 @@ public class Spider : TorClient
         return PingMap[domain] > 1000;
     }
     
-    static string? GetLeftOf(string text, string leftOf, string separator)
+    static string GetLeftOf(string text, string leftOf, string separator)
     {
         if (text == null)
             throw new ArgumentNullException(nameof(text));
@@ -450,7 +450,7 @@ public class Spider : TorClient
         if (separator == null)
             throw new ArgumentNullException(nameof(separator));
 
-        string?[] split = text.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+        var split = text.Split(separator, StringSplitOptions.RemoveEmptyEntries);
         for (int i = 0; i < split.Length; i++)
         {
             if (split[i] == null || !split[i].Equals(leftOf, StringComparison.InvariantCultureIgnoreCase))
