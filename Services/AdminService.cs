@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ATS.Common;
 using ATS.Common.Auth;
 using ATS.Common.Extensions;
 using ATS.Common.Helpers;
@@ -154,13 +155,16 @@ public class AdminService : Service
                 if (ping == null)
                     continue;
 
+                var pingStats = HostContext.AppHost.Resolve<PingStats>();
+
                 if (ping.Url.Contains(request.Domain))
                 {
                     archived.Add(ping.Url);
+                    pingStats.Update(ping.Url, PingStats.PingState.Blacklisted);
                     continue;
                 }
 
-                if (!spider.IsThrottledOrBlacklisted(ping.Url, false))
+                if (spider.IsThrottledOrBlacklisted(ping.Url) == PingStats.PingState.Ok)
                     spider.PublishPingUpdate(mqClient, ping.Url);
             }
 
@@ -359,7 +363,42 @@ public class AdminService : Service
     {
         var spider = HostContext.AppHost.Resolve<Spider>();
         return spider.PingMap.Keys.ToList();
-    }    
+    }
+
+    [RequiresAccessKey]
+    public object Get(GetMessageBrokerStats request)
+    {
+        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+        return mqServer.GetStatsDescription();
+    }
+
+    [RequiresAccessKey]
+    public object Get(GetMessageCount request)
+    {
+        if (request.TypeFullName.IsNullOrEmpty())
+            throw HttpError.BadRequest(nameof(request.TypeFullName));
+        
+        var type = FindTypeInAllAssembliesByFullName(request.TypeFullName);
+        if (type == null)
+            throw HttpError.NotFound(nameof(request.TypeFullName));
+        
+        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
+
+        var queueNames = new QueueNames(type);
+        switch (request.QueueType)
+        {
+            case RabbitMqQueueType.Priority:
+                return mqClient.Channel.QueueDeclarePassive(queueNames.Priority).MessageCount;
+            case RabbitMqQueueType.In:
+                return mqClient.Channel.QueueDeclarePassive(queueNames.In).MessageCount;
+            case RabbitMqQueueType.Out:
+                return mqClient.Channel.QueueDeclarePassive(queueNames.Out).MessageCount;
+            case RabbitMqQueueType.Dlq:
+                return mqClient.Channel.QueueDeclarePassive(queueNames.Dlq).MessageCount;
+        }
+        return 0;
+    }
 
     private void Republish<T>(int count, bool delayed = false)
     {

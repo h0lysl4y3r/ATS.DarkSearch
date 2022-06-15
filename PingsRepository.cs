@@ -10,6 +10,7 @@ namespace ATS.DarkSearch;
 public class PingsRepository
 {
     public const string PingsIndex = "pings";
+    public const int DefaultSize = 10;
 
     private readonly ElasticClient _client;
     
@@ -18,7 +19,7 @@ public class PingsRepository
         _client = client;
     }
     
-    public IReadOnlyCollection<PingResultPoco> Search(string text, out long total, int from = 0, int size = 10)
+    public IReadOnlyCollection<PingResultPoco> Search(string text, out long total, int from = 0, int size = DefaultSize)
     {
         total = 0;
         

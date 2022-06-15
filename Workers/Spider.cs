@@ -269,7 +269,7 @@ public class Spider : TorClient
         
         Log.Information($"{nameof(Spider)}:{nameof(Ping)} pinging {url}");
 
-        if (IsThrottledOrBlacklisted(url, true))
+        if (IsThrottledOrBlacklisted(url) != PingStats.PingState.Ok)
             return null;
 
         pingStats.Update(url, PingStats.PingState.Ok);
@@ -336,7 +336,7 @@ public class Spider : TorClient
         return ping;
     }
 
-    public bool IsThrottledOrBlacklisted(string url, bool updateStats)
+    public PingStats.PingState IsThrottledOrBlacklisted(string url)
     {
         if (url == null)
             throw new ArgumentNullException(nameof(url));
@@ -347,28 +347,25 @@ public class Spider : TorClient
         if (tld == null)
         {
             Log.Warning($"{nameof(Spider)}:{nameof(Ping)} {url} is no onion site");
-            if (updateStats)
-                pingStats.Update(url, PingStats.PingState.Blacklisted);
-            return true;
+            pingStats.Update(url, PingStats.PingState.Blacklisted);
+            return PingStats.PingState.Blacklisted;
         }
         
         if (Blacklist.Any(x => x.Contains(tld)))
         {
             Log.Warning($"{nameof(Spider)}:{nameof(Ping)} {url} is blacklisted");
-            if (updateStats)
-                pingStats.Update(url, PingStats.PingState.Blacklisted);
-            return true;
+            pingStats.Update(url, PingStats.PingState.Blacklisted);
+            return PingStats.PingState.Blacklisted;
         }
 
         if (ThrottlePing(tld))
         {
             Log.Warning($"{nameof(Spider)}:{nameof(Ping)} {url} is throttled");
-            if (updateStats)
-                pingStats.Update(url, PingStats.PingState.Throttled);
-            return true;
+            pingStats.Update(url, PingStats.PingState.Throttled);
+            return PingStats.PingState.Throttled;
         }
 
-        return false;
+        return PingStats.PingState.Ok;
     }
 
     public void PublishPingUpdate(RabbitMqQueueClient mqClient, string url)

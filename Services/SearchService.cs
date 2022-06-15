@@ -18,7 +18,8 @@ public class SearchService : Service
             throw HttpError.BadRequest(nameof(request.Text));
         
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
-        var pings = repo.Search(request.Text, out var total, request.Page);
+        var pings = repo
+            .Search(request.Text, out var total, request.Page * PingsRepository.DefaultSize);
        
         return new SearchResponse()
         {
