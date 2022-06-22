@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using ATS.Common;
 using ATS.Common.Auth;
 using ATS.Common.Extensions;
 using ATS.Common.Helpers;
@@ -146,10 +145,12 @@ public class AdminService : Service
                 }
                 count++;
 
+                // no more messages?
                 var message = mqClient.Get<Ping>(QueueNames<Ping>.In);
                 if (message == null)
                     break;
             
+                // no ping to update?
                 mqClient.Ack(message);
                 var ping = message.GetBody();
                 if (ping == null)
@@ -157,6 +158,7 @@ public class AdminService : Service
 
                 var pingStats = HostContext.AppHost.Resolve<PingStats>();
 
+                // archive selected pings (they are essentially blacklisted)
                 if (ping.Url.Contains(request.Domain))
                 {
                     archived.Add(ping.Url);
@@ -164,6 +166,7 @@ public class AdminService : Service
                     continue;
                 }
 
+                // schedule to update if not throttled or blacklisted
                 if (spider.IsThrottledOrBlacklisted(ping.Url) == PingStats.PingState.Ok)
                     spider.PublishPingUpdate(mqClient, ping.Url);
             }
@@ -207,7 +210,7 @@ public class AdminService : Service
         if (request.TypeFullName.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.TypeFullName));
 
-        var type = FindTypeInAllAssembliesByFullName(request.TypeFullName);
+        var type = AssemblyHelpers.FindTypeInAllAssembliesByFullName(request.TypeFullName);
         if (type == null)
             throw HttpError.NotFound(nameof(request.TypeFullName));
         
@@ -272,7 +275,7 @@ public class AdminService : Service
         var spider = HostContext.Resolve<Spider>();
             return new PingSingleResponse()
         {
-            Ping = await spider.Ping(request.Url, true)
+            Ping = await spider.Ping(request.Url)
         };
     }
 
@@ -362,7 +365,7 @@ public class AdminService : Service
     public object Get(GetPingStatsThrottled request)
     {
         var spider = HostContext.AppHost.Resolve<Spider>();
-        return spider.PingMap.Keys.ToList();
+        return spider.ThrottleMap.Keys.ToList();
     }
 
     [RequiresAccessKey]
@@ -375,29 +378,7 @@ public class AdminService : Service
     [RequiresAccessKey]
     public object Get(GetMessageCount request)
     {
-        if (request.TypeFullName.IsNullOrEmpty())
-            throw HttpError.BadRequest(nameof(request.TypeFullName));
-        
-        var type = FindTypeInAllAssembliesByFullName(request.TypeFullName);
-        if (type == null)
-            throw HttpError.NotFound(nameof(request.TypeFullName));
-        
-        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
-        using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
-
-        var queueNames = new QueueNames(type);
-        switch (request.QueueType)
-        {
-            case RabbitMqQueueType.Priority:
-                return mqClient.Channel.QueueDeclarePassive(queueNames.Priority).MessageCount;
-            case RabbitMqQueueType.In:
-                return mqClient.Channel.QueueDeclarePassive(queueNames.In).MessageCount;
-            case RabbitMqQueueType.Out:
-                return mqClient.Channel.QueueDeclarePassive(queueNames.Out).MessageCount;
-            case RabbitMqQueueType.Dlq:
-                return mqClient.Channel.QueueDeclarePassive(queueNames.Dlq).MessageCount;
-        }
-        return 0;
+        return ATSAppHost.GetBrokerMessageCount(request.TypeFullName, request.QueueType);
     }
 
     private void Republish<T>(int count, bool delayed = false)
@@ -434,15 +415,5 @@ public class AdminService : Service
                 }
             }
         });
-    }
-    
-    private static Type FindTypeInAllAssembliesByFullName(string typeFullName)
-    {
-        if (typeFullName == null)
-            throw new ArgumentNullException(nameof(typeFullName));
-
-        return AppDomain.CurrentDomain.GetAssemblies()
-            .SelectMany(x => x.GetTypes())
-            .FirstOrDefault(x => x.FullName.Equals(typeFullName, StringComparison.InvariantCulture));
     }
 }

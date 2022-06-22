@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using AngleSharp;
 using AngleSharp.Html.Dom;
 using AngleSharp.Html.Parser;
+using ATS.Common;
 using ATS.Common.Extensions;
 using ATS.Common.Helpers;
 using ATS.Common.Model.DarkSearch;
@@ -35,9 +36,11 @@ public class Spider : TorClient
         public string[] Links { get; set; }
     }
 
+    public const int PingInMessageLimit = 10 * 1000;
+    
     public bool IsPaused { get; set; }
     public List<string> Blacklist { get; private set; }
-    public Dictionary<string, int> PingMap { get; private set; } = new Dictionary<string, int>();
+    public Dictionary<string, int> ThrottleMap { get; private set; } = new Dictionary<string, int>();
     
     public Spider(Microsoft.Extensions.Configuration.IConfiguration config, 
         IWebHostEnvironment hostEnvironment)
@@ -55,7 +58,15 @@ public class Spider : TorClient
         var hostEnvironment = HostContext.AppHost.Resolve<IWebHostEnvironment>();
         
         var cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
-        var blacklist = redis.Get<List<string>>(cacheKey);
+        List<string> blacklist = null;
+        try
+        {
+            blacklist = redis.Get<List<string>>(cacheKey);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, ex.Message);
+        }
         if (!blacklist.IsNullOrEmpty())
         {
             foreach (var item in blacklist)
@@ -64,10 +75,6 @@ public class Spider : TorClient
                     Blacklist.AddRange(blacklist);
             }
         }
-        
-        cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:PingMap";
-        var pingMap = redis.Get<Dictionary<string, int>>(cacheKey);
-        PingMap = pingMap ?? new Dictionary<string, int>();
     }
 
     public async Task<PingResultPoco> ExecuteAsync(string url)
@@ -247,7 +254,7 @@ public class Spider : TorClient
             .ToList();
     }
     
-    public async Task<PingResultPoco> Ping(string url, bool publishUpdate)
+    public async Task<PingResultPoco> Ping(string url)
     {
         if (string.IsNullOrEmpty(url))
             throw HttpError.BadRequest(nameof(url));
@@ -260,8 +267,8 @@ public class Spider : TorClient
         if (IsPaused)
         {
             Log.Warning($"{nameof(Spider)}:{nameof(Ping)} paused but calling ping on " + url);
-            if (publishUpdate)
-                PublishPingUpdate(mqClient, url);
+                
+            PublishPingUpdate(mqClient, url);
             
             pingStats.Update(url, PingStats.PingState.Paused);
             return null;
@@ -272,6 +279,12 @@ public class Spider : TorClient
         if (IsThrottledOrBlacklisted(url) != PingStats.PingState.Ok)
             return null;
 
+        if (ATSAppHost.GetBrokerMessageCount(typeof(Ping).FullName, RabbitMqQueueType.In) > PingInMessageLimit)
+        {
+            pingStats.Update(url, PingStats.PingState.Paused);
+            return null;
+        }
+        
         pingStats.Update(url, PingStats.PingState.Ok);
 
         // Ping
@@ -285,14 +298,8 @@ public class Spider : TorClient
         {
             Log.Debug(ex.Message);
 
-            if (publishUpdate)
-            {
-                PublishPingUpdate(mqClient, url);
-                return null;
-            }
-            
-            // if we don't ping update, let's just re-throw
-            throw;
+            PublishPingUpdate(mqClient, url);
+            return null;
         }
 
         // ping will be null if we tried to read a non-html content
@@ -330,8 +337,7 @@ public class Spider : TorClient
         }
 		
         // update ping
-        if (publishUpdate)
-            PublishPingUpdate(mqClient, ping.Url);
+        PublishPingUpdate(mqClient, ping.Url);
 
         return ping;
     }
@@ -423,19 +429,10 @@ public class Spider : TorClient
         if (domain == null)
             throw new ArgumentNullException(nameof(domain));
 
-        if (!PingMap.ContainsKey(domain)) PingMap[domain] = 0;
-        PingMap[domain]++;
+        if (!ThrottleMap.ContainsKey(domain)) ThrottleMap[domain] = 0;
+        ThrottleMap[domain]++;
 
-        if (PingMap[domain] % 10 == 0)
-        {
-            var clientsManager = HostContext.AppHost.Resolve<IRedisClientsManager>();
-            using var redis = clientsManager.GetClient();
-
-            var cacheKey = $"ATS.DarkSearch:{_hostEnvironment.EnvironmentName}:{nameof(Spider)}:PingMap";
-            redis.Set(cacheKey, PingMap);
-        }
-
-        return PingMap[domain] > 1000;
+        return ThrottleMap[domain] > 1000;
     }
     
     static string GetLeftOf(string text, string leftOf, string separator)

@@ -23,7 +23,7 @@ public class PingService : Service
 			return;
 		}
 		
-		await spider.Ping(request.Url, true);
+		await spider.Ping(request.Url);
 	}
 	
 	[RequiresAccessKey]

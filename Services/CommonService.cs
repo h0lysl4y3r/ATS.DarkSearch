@@ -2,8 +2,6 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net;
-using ATS.Common;
 using ATS.Common.Auth;
 using ATS.Common.Model;
 using ATS.Common.Model.DarkSearch;

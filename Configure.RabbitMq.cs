@@ -1,11 +1,11 @@
-using System.Collections.Generic;
+using System;
+using System.Threading;
 using ATS.Common.Model.DarkSearch;
 using ATS.Common.ServiceStack;
 using ATS.DarkSearch.Workers;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Nest;
+using Serilog;
 using ServiceStack;
 using ServiceStack.Messaging;
 using RabbitMqWorker = ATS.DarkSearch.Workers.RabbitMqWorker;
@@ -24,8 +24,14 @@ public class ConfigureRabbitMq : IHostingStartup
         })
         .ConfigureAppHost(appHost =>
         {
+
+            var connectionString = appHost.AppSettings.GetString("ConnectionStrings:RabbitMq");
+
+            var rabbitMqUri = new Uri(connectionString);
+            Log.Information($"Configuring RabbitMq with {rabbitMqUri.DnsSafeHost}:{rabbitMqUri.Port}");
+            
             var mqServer = new ATSRabbitMqServer(RabbitMqWorker.DelayedMessagesExchange,
-                appHost.AppSettings.GetString("ConnectionStrings:RabbitMq"))
+                connectionString)
             {
                 DisablePublishingToOutq = true,
                 DisablePublishingResponses = true,
@@ -37,8 +43,5 @@ public class ConfigureRabbitMq : IHostingStartup
             mqServer.RegisterHandler<TryNewPing>(appHost.ExecuteMessage, 1);
             mqServer.RegisterHandler<StorePing>(appHost.ExecuteMessage, 1);
             mqServer.RegisterHandler<UpdatePing>(appHost.ExecuteMessage, 1, RabbitMqWorker.DelayedMessagesExchange);
-            
-            // using var mqClient = mqServer.CreateMessageQueueClient();
-            // mqClient.Publish(new Hello { Name = "Bugs Bunny" });
         });
 }

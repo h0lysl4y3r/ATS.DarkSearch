@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+LABEL maintainer="Igor Demovic <demovic@atsecurity.net>"
+
+WORKDIR ./app
+
+# Copy csproj and restore as distinct layers
+COPY ./*.csproj ./
+# Restore from nuget.org & custom feed with ATS.xxx projects
+RUN dotnet restore -s https://api.nuget.org/v3/index.json
+
+# Copy everything else and build
+COPY ./ ./
+RUN dotnet publish -c Release -o build
+
+# Build runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:6.0 as runtime
+WORKDIR /app
+COPY --from=build /app/build .
+
+RUN mkdir -p /app/out
+
+EXPOSE 80
+EXPOSE 443
+
+ENTRYPOINT ["dotnet", "/app/ATS.DarkSearch.dll", "--environment=Development2"]
