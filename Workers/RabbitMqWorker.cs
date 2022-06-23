@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using ATS.Common.Helpers;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using ServiceStack;
@@ -15,8 +16,10 @@ public class RabbitMqWorker : BackgroundService
     
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
+        var config = HostContext.Resolve<Microsoft.Extensions.Configuration.IConfiguration>();
+
         // startup delay
-        var delay = 10;
+        var delay = config.GetValue<int>($"AppSettings:RabbitMqWorkerStartupDelaySec");
         Log.Information($"{nameof(RabbitMqWorker)} will start in {delay}s");
         await Task.Delay(delay * 1000, cancellationToken);
 

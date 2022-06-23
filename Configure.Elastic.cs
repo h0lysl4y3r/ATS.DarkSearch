@@ -17,12 +17,7 @@ public class ConfigureElastic : IHostingStartup
         .ConfigureServices((context,services) =>
         {
             services.AddSingleton<PingsRepository>();
-
-            // startup delay
-            var delay = 10;
-            Log.Information($"{nameof(ConfigureElastic)} will start in {delay}s");
-            Thread.Sleep(delay * 1000);
-
+            
             Log.Information("Configuring Elasticsearch");
             
             var pool = new SingleNodeConnectionPool(new Uri(context.Configuration["ConnectionStrings:Elastic"]));
