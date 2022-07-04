@@ -13,13 +13,18 @@ public class RabbitMqWorker : BackgroundService
 {
     public const string DelayedMessagesExchange = "mx.servicestack.delayed";
     private const int MqStatsDescriptionDurationMs = 600 * 1000;
+
+    private readonly Microsoft.Extensions.Configuration.IConfiguration _config;
     
+    public RabbitMqWorker(Microsoft.Extensions.Configuration.IConfiguration config)
+    {
+        _config = config;
+    }
+
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        var config = HostContext.Resolve<Microsoft.Extensions.Configuration.IConfiguration>();
-
         // startup delay
-        var delay = config.GetValue<int>($"AppSettings:RabbitMqWorkerStartupDelaySec");
+        var delay = _config.GetValue<int>($"AppSettings:RabbitMqWorkerStartupDelaySec");
         Log.Information($"{nameof(RabbitMqWorker)} will start in {delay}s");
         await Task.Delay(delay * 1000, cancellationToken);
 

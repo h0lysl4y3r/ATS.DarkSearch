@@ -23,7 +23,6 @@ public class ConfigureRabbitMq : IHostingStartup
         })
         .ConfigureAppHost(appHost =>
         {
-
             var connectionString = appHost.AppSettings.GetString("ConnectionStrings:RabbitMq");
 
             var rabbitMqUri = new Uri(connectionString);
