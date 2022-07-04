@@ -1,4 +1,3 @@
-using System.Threading;
 using Microsoft.AspNetCore.Hosting;
 using Serilog;
 using ServiceStack;

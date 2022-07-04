@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using ATS.Common.Poco;
 using Elasticsearch.Net;
 using Microsoft.AspNetCore.Hosting;

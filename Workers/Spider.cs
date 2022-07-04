@@ -89,7 +89,7 @@ public class Spider : TorClient
 
         var response = await SendAsync(request, CancellationToken.None);
         var reason = response.ReasonPhrase ?? "N/A";
-        Log.Debug($"{nameof(Spider)} with response {response.StatusCode} ({reason})");
+        Log.Information($"[{nameof(Spider)}:{nameof(ExecuteAsync)}] with response {response.StatusCode} ({reason})");
 
         // document must be of text/html content-type
         var contentType = response.GetHeaderValueSafe(HeaderNames.ContentType);
@@ -348,25 +348,27 @@ public class Spider : TorClient
             throw new ArgumentNullException(nameof(url));
 
         var pingStats = HostContext.AppHost.Resolve<PingStats>();
-
-        var tld = GetLeftOf(UriHelpers.GetUriSafe(url).DnsSafeHost, "onion", ".");
-        if (tld == null)
-        {
-            Log.Warning($"{nameof(Spider)}:{nameof(Ping)} {url} is no onion site");
-            pingStats.Update(url, PingStats.PingState.Blacklisted);
-            return PingStats.PingState.Blacklisted;
-        }
         
-        if (Blacklist.Any(x => x.Contains(tld)))
+        if (!url.Contains(".onion"))
         {
-            Log.Warning($"{nameof(Spider)}:{nameof(Ping)} {url} is blacklisted");
+            Log.Error($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is no onion site");
             pingStats.Update(url, PingStats.PingState.Blacklisted);
             return PingStats.PingState.Blacklisted;
         }
 
-        if (ThrottlePing(tld))
+        var host = UriHelpers.GetUriSafe(url).DnsSafeHost;
+        var domain = host.Split(new[] {'.'})[0];
+        
+        if (Blacklist.Any(x => x.Contains(domain)))
         {
-            Log.Warning($"{nameof(Spider)}:{nameof(Ping)} {url} is throttled");
+            Log.Warning($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is blacklisted");
+            pingStats.Update(url, PingStats.PingState.Blacklisted);
+            return PingStats.PingState.Blacklisted;
+        }
+
+        if (ThrottlePing(domain))
+        {
+            Log.Warning($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is throttled");
             pingStats.Update(url, PingStats.PingState.Throttled);
             return PingStats.PingState.Throttled;
         }
@@ -376,7 +378,7 @@ public class Spider : TorClient
 
     public void PublishPingUpdate(RabbitMqQueueClient mqClient, string url)
     {
-        Log.Debug($"{nameof(PingService)}:{nameof(PublishPingUpdate)} Publishing update of " + url);
+        Log.Information($"[{nameof(PingService)}:{nameof(PublishPingUpdate)}] Publishing update of " + url);
         
         var delayStr = _config.GetValue<string>("AppSettings:RefreshPingIntervalMs");
         var delay = long.Parse(delayStr);
@@ -433,26 +435,5 @@ public class Spider : TorClient
         ThrottleMap[domain]++;
 
         return ThrottleMap[domain] > 1000;
-    }
-    
-    static string GetLeftOf(string text, string leftOf, string separator)
-    {
-        if (text == null)
-            throw new ArgumentNullException(nameof(text));
-        if (leftOf == null)
-            throw new ArgumentNullException(nameof(leftOf));
-        if (separator == null)
-            throw new ArgumentNullException(nameof(separator));
-
-        var split = text.Split(separator, StringSplitOptions.RemoveEmptyEntries);
-        for (int i = 0; i < split.Length; i++)
-        {
-            if (split[i] == null || !split[i].Equals(leftOf, StringComparison.InvariantCultureIgnoreCase))
-                continue;
-
-            return i == 0 ? null : split[i - 1];
-        }
-
-        return null;
     }
 }

@@ -19,7 +19,7 @@ public class PingService : Service
 		var spider = HostContext.Resolve<Spider>();
 		if (spider.IsPaused)
 		{
-			Log.Debug($"{nameof(PingService)}:{nameof(Ping)} {nameof(Spider)} is paused when pinging " + request.Url);
+			Log.Warning($"[{nameof(PingService)}:{nameof(Ping)}] {nameof(Spider)} is paused when pinging " + request.Url);
 			return;
 		}
 		
@@ -59,7 +59,7 @@ public class PingService : Service
 
 		if (ping != null)
 		{
-			Log.Warning($"{nameof(PingService)}:{nameof(TryNewPing)} Ping already stored for " + request.Url);
+			Log.Warning($"[{nameof(PingService)}:{nameof(TryNewPing)}] Ping already stored for " + request.Url);
 			return;
 		}
 
@@ -86,7 +86,7 @@ public class PingService : Service
 		var mqServer = HostContext.Resolve<IMessageService>();
 		using var mqClient = mqServer.CreateMessageQueueClient();
 
-		Log.Debug($"{nameof(PingService)}:{nameof(UpdatePing)} Update ping of " + url);
+		Log.Information($"{nameof(PingService)}:{nameof(UpdatePing)} Update ping of " + url);
         
 		mqClient.Publish(new Ping()
 		{

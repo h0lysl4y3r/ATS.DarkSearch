@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 using ATS.Common.Model.DarkSearch;
 using ATS.Common.ServiceStack;
 using ATS.DarkSearch.Workers;

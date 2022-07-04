@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using ATS.Common.Auth;
 using ATS.Common.Extensions;
 using ATS.Common.Helpers;
+using ATS.Common.Model;
 using ATS.Common.Model.DarkSearch;
 using ATS.Common.ServiceStack;
 using ATS.DarkSearch.Workers;
@@ -139,7 +140,7 @@ public class AdminService : Service
                         IOHelpers.EnsureDirectory($"~/out/archived/{request.Domain}".MapServerPath());
                         var dumpPath = $"~/out/archived/{request.Domain}/{DateTimeOffset.UtcNow.ToString("yyMMdd_hhmmss")}.txt".MapServerPath();
                         File.WriteAllLines(dumpPath, archived);
-                        Log.Debug($"{nameof(ArchivePings)}: archived " + archived.Count + " into " + dumpPath);
+                        Log.Debug($"[{nameof(AdminService)}:{nameof(ArchivePings)}] archived " + archived.Count + " into " + dumpPath);
                         archived.Clear();
                     }
                 }
@@ -171,7 +172,7 @@ public class AdminService : Service
                     spider.PublishPingUpdate(mqClient, ping.Url);
             }
 
-            Log.Debug($"{nameof(ArchivePings)}: archiving finished");
+            Log.Information($"[{nameof(AdminService)}:{nameof(ArchivePings)}] archiving finished");
         });
         
         return new HttpResult();
@@ -250,12 +251,12 @@ public class AdminService : Service
                 var existingPing = repo.Get(link);
                 if (existingPing != null)
                 {
-                    Log.Debug($"{nameof(AdminService)}:{nameof(PingAll)} Skipping, ping of " + link + " exists");
+                    Log.Debug($"[{nameof(AdminService)}:{nameof(PingAll)}] Skipping, ping of " + link + " exists");
                     continue;
                 }
             }
             
-            Log.Debug($"{nameof(AdminService)}:{nameof(PingAll)} Scheduling ping of " + link);
+            Log.Information($"[{nameof(AdminService)}:{nameof(PingAll)}] Scheduling ping of " + link);
             mqClient.Publish(new Ping()
             {
                 Url = link,
@@ -379,6 +380,15 @@ public class AdminService : Service
     public object Get(GetMessageCount request)
     {
         return ATSAppHost.GetBrokerMessageCount(request.TypeFullName, request.QueueType);
+    }
+
+    [RequiresAccessKey]
+    public object Put(UpdateServiceUrl request)
+    {
+        if (!AppHostHelpers.UpdateServiceUrl(Request, request.Url, request.ServiceName))
+            throw HttpError.ServiceUnavailable($"Failed to update {request.ServiceName}");
+        
+        return new HttpResult();
     }
 
     private void Republish<T>(int count, bool delayed = false)
