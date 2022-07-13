@@ -36,6 +36,9 @@ public class AdminService : Service
     [RequiresAccessKey]
     public object Get(GetAllUrls request)
     {
+        if (request.MaxResults <= 0)
+            throw HttpError.BadRequest(nameof(request.MaxResults));
+        
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
         var maxResults = Math.Min(request.MaxResults, 1000);
         var urls = repo.GetUrls(request.InputScrollId, out var outputScrollId, request.MaxResults);
@@ -149,7 +152,10 @@ public class AdminService : Service
                 // no more messages?
                 var message = mqClient.Get<Ping>(QueueNames<Ping>.In);
                 if (message == null)
+                {
+                    Log.Debug($"[{nameof(AdminService)}:{nameof(ArchivePings)}] archived {count}, looks like no more to archive");
                     break;
+                }
             
                 // no ping to update?
                 mqClient.Ack(message);
@@ -359,7 +365,7 @@ public class AdminService : Service
     public object Get(GetPingStatsBlacklisted request)
     {
         var spider = HostContext.AppHost.Resolve<Spider>();
-        return spider.Blacklist;
+        return spider.Blacklist.ToList();
     }    
 
     [RequiresAccessKey]

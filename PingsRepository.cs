@@ -33,7 +33,8 @@ public class PingsRepository
                 .MultiMatch(m => m
                     .Fields(f => f
                         .Field(f1 => f1.Title)
-                        .Field(f2 => f2.Description))
+                        .Field(f2 => f2.Description)
+                        .Field(f3 => f3.Texts))
                     .Query(text))));
 
         total = response.Total;

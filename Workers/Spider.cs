@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using AngleSharp;
@@ -40,13 +42,14 @@ public class Spider : TorClient
     
     public bool IsPaused { get; set; }
     public List<string> Blacklist { get; private set; }
-    public Dictionary<string, int> ThrottleMap { get; private set; } = new Dictionary<string, int>();
+    public ConcurrentDictionary<string, int> ThrottleMap { get; private set; } = new ConcurrentDictionary<string, int>();
     
     public Spider(Microsoft.Extensions.Configuration.IConfiguration config, 
         IWebHostEnvironment hostEnvironment)
         : base(config, hostEnvironment)
     {
-        Blacklist = config.GetSection("AppSettings:Blacklist").Get<List<string>>();
+        Blacklist = config.GetSection("AppSettings:Blacklist")
+            .Get<List<string>>();
     }
 
     public override async Task StartAsync(CancellationToken cancellationToken)
@@ -72,7 +75,7 @@ public class Spider : TorClient
             foreach (var item in blacklist)
             {
                 if (!Blacklist.Contains(item))
-                    Blacklist.AddRange(blacklist);
+                    Blacklist.Add(item);
             }
         }
     }
@@ -82,10 +85,10 @@ public class Spider : TorClient
         if (url == null)
             throw new ArgumentNullException(nameof(url));
 
-        // GET request url with 30s timeout 
+        // request site
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Options.Set(new HttpRequestOptionsKey<TimeSpan>("RequestTimeout"),
-            TimeSpan.FromSeconds(30));
+            TimeSpan.FromSeconds(45));
 
         var response = await SendAsync(request, CancellationToken.None);
         var reason = response.ReasonPhrase ?? "N/A";
@@ -170,19 +173,59 @@ public class Spider : TorClient
 
                 var textContent = new TextContent();
 
-                var title = document.All.FirstOrDefault(m => m.LocalName == "title");
-                textContent.Title = title?.TextContent ?? "";
-            
-                var description = document.All.FirstOrDefault(m => m.LocalName == "description");
-                textContent.Description = description?.TextContent ?? "";
+                var titleElement = document.All
+                    .FirstOrDefault(e => e.LocalName == "title");
+                var descriptionElement = document.All
+                    .FirstOrDefault(e => e.LocalName == "description");
+
+                string[] bodyTexts = null;
+                if (document.Body != null)
+                {
+                    bodyTexts = document.Body
+                        .Children
+                        .Where(e => e.LocalName is "div" or "span" or "p"
+                                    && !e.TextContent.IsNullOrEmpty())
+                        .Select(e => e.TextContent)
+                        .ToArray();
+
+                    // texts
+                    textContent.Texts = bodyTexts;
+                }
+                
+                // description
+                if (descriptionElement?.TextContent != null 
+                    && descriptionElement.TextContent.Length > 0
+                    && !descriptionElement.TextContent.Contains("<"))
+                {
+                    textContent.Description = descriptionElement.TextContent;
+                }
+                else if (bodyTexts != null)
+                {
+                    var bodyText = string.Join(" ", bodyTexts);
+                    var wordSplit = Regex.Split(bodyText, @"\W");
+                    var wordSplitSubset = wordSplit.Take(40).ToArray();
+                    textContent.Description = string.Join(" ", wordSplitSubset);
+                }
+                else
+                {
+                    textContent.Description = "";
+                }
+
+                // title
+                if (titleElement?.TextContent != null && titleElement.TextContent.Length > 0)
+                {
+                    textContent.Title = titleElement.TextContent;
+                }
+                else
+                {
+                    textContent.Title = textContent.Description;
+                }
 
                 if (document.Body != null)
                 {
-                    textContent.Texts = document.Body.Children
-                        .Select(x => x.TextContent)
-                        .ToArray();
                 }
-                
+
+                // links
                 textContent.Links = document
                     .Links
                     .OfType<IHtmlAnchorElement>()
@@ -359,7 +402,7 @@ public class Spider : TorClient
         var host = UriHelpers.GetUriSafe(url).DnsSafeHost;
         var domain = host.Split(new[] {'.'})[0];
         
-        if (Blacklist.Any(x => x.Contains(domain)))
+        if (Blacklist.Any(x => x != null && x.Contains(domain)))
         {
             Log.Warning($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is blacklisted");
             pingStats.Update(url, PingStats.PingState.Blacklisted);
@@ -423,7 +466,7 @@ public class Spider : TorClient
             Blacklist.Remove(domain);
         }
         
-        return redis.Set(cacheKey, Blacklist);
+        return redis.Set(cacheKey, Blacklist.ToList());
     }
 
     private bool ThrottlePing(string domain)

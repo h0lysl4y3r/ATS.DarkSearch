@@ -47,9 +47,13 @@ public class CommonService : Service
         }
     }
     
-    [RequiresAccessKey]
     public object Get(GetHealth<GetHealthResponse> request)
     {
+        var utcNow = DateTimeOffset.UtcNow;
+        if (_lastHealthCheck != null && (utcNow - _lastHealthCheckTime).TotalSeconds <= 5)
+            return _lastHealthCheck;
+        _lastHealthCheckTime = utcNow;
+        
         var client = HostContext.AppHost.Resolve<ElasticClient>();
         var pingResponse = client.Ping();
 
@@ -59,16 +63,18 @@ public class CommonService : Service
 
         var mqServer = HostContext.AppHost.Resolve<IMessageService>();
 
-        return new GetHealthResponse()
+        _lastHealthCheck = new GetHealthResponse()
         {
             RedisState = redisPing ? "" : "No ping",
             ElasticState = pingResponse.OriginalException?.Message ?? "",
             // Potential Statuses: Disposed, Stopped, Stopping, Starting, Started
             RabbitMqState = mqServer.GetStatus()
         };
+        return _lastHealthCheck;
     }
+    private static DateTimeOffset _lastHealthCheckTime;
+    private static GetHealthResponse _lastHealthCheck;
 
-    [RequiresAccessKey]
     public object Get(GetVersion request)
     {
         return typeof(CommonService).Assembly.GetName().Version;
