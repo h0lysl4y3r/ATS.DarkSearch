@@ -64,7 +64,7 @@ public class AdminService : Service
             File.WriteAllLines(dumpPath, urls);
         });
         
-        return dumpPath;
+        return new HttpResult(dumpPath);
     }
 
     [RequiresAccessKey]
@@ -280,7 +280,7 @@ public class AdminService : Service
             throw HttpError.BadRequest(nameof(request.Url));
         
         var spider = HostContext.Resolve<Spider>();
-            return new PingSingleResponse()
+        return new PingSingleResponse()
         {
             Ping = await spider.Ping(request.Url)
         };
@@ -353,39 +353,33 @@ public class AdminService : Service
             Paused72h = pingStats.Get(minus72h, PingStats.PingState.Paused),
         };
     }
-
-    public object Get(GetUtcNowTicks request)
-    {
-        var utcNow = DateTimeOffset.UtcNow;
-        var now = new DateTime(utcNow.Year, utcNow.Month, utcNow.Day, utcNow.Hour, 0, 0);
-        return now.Ticks;
-    }
-
+    
     [RequiresAccessKey]
     public object Get(GetPingStatsBlacklisted request)
     {
         var spider = HostContext.AppHost.Resolve<Spider>();
-        return spider.Blacklist.ToList();
+        return new HttpResult(spider.Blacklist.ToList());
     }    
 
     [RequiresAccessKey]
     public object Get(GetPingStatsThrottled request)
     {
         var spider = HostContext.AppHost.Resolve<Spider>();
-        return spider.ThrottleMap.Keys.ToList();
+        return new HttpResult(spider.ThrottleMap.Keys.ToList());
     }
 
     [RequiresAccessKey]
     public object Get(GetMessageBrokerStats request)
     {
         var mqServer = HostContext.AppHost.Resolve<IMessageService>();
-        return mqServer.GetStatsDescription();
+        return new HttpResult(mqServer.GetStatsDescription());
     }
 
     [RequiresAccessKey]
     public object Get(GetMessageCount request)
     {
-        return ATSAppHost.GetBrokerMessageCount(request.TypeFullName, request.QueueType);
+        var count = ATSAppHost.GetBrokerMessageCount(request.TypeFullName, request.QueueType);
+        return new HttpResult(count);
     }
 
     [RequiresAccessKey]
@@ -395,6 +389,27 @@ public class AdminService : Service
             throw HttpError.ServiceUnavailable($"Failed to update {request.ServiceName}");
         
         return new HttpResult();
+    }
+
+    [RequiresAccessKey]
+    public object Get(GetUtcNowTicks request)
+    {
+        var utcNow = DateTimeOffset.UtcNow;
+        var now = new DateTime(utcNow.Year, utcNow.Month, utcNow.Day, utcNow.Hour, 0, 0);
+        return new HttpResult(now.Ticks);
+    }
+
+    [RequiresAccessKey]
+    public object Get(GetDomain request)
+    {
+        if (request.Url.IsNullOrEmpty())
+            throw HttpError.BadRequest(nameof(request.Url));
+
+        var uri = UriHelpers.GetUriSafe(request.Url);
+        if (uri == null)
+            throw HttpError.BadRequest(nameof(request.Url));
+        
+        return new HttpResult(uri.DnsSafeHost);
     }
 
     private void Republish<T>(int count, bool delayed = false)

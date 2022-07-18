@@ -4,4 +4,8 @@
 /obj
 /.idea
 /Logs
-/Dockerfile
+/Dockerfile.*
+/Tor
+ATS.DarkSearch.sln.DotSettings.user
+/Data
+appsettings*.json

@@ -21,30 +21,23 @@ public class CommonService : Service
                 CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var dateTime))
             throw HttpError.BadRequest(nameof(request.DateStr));
 
-        try
-        {
-            var files = Directory.GetFiles("~Logs".MapServerPath());
+        var files = Directory.GetFiles("~Logs".MapServerPath());
 
-            string file = null;
-            if (request.DateStr != null)
-            {
-                file = files.FirstOrDefault(x => x.Contains(request.DateStr));
-                if (file == null)
-                    throw HttpError.NotFound(request.DateStr);
-            }
-            else
-            {
-                file = files.OrderByDescending(x => x).FirstOrDefault();
-                if (file == null)
-                    return "";
-            }
-            
-            return System.IO.File.ReadAllText(file);
-        }
-        catch (Exception e)
+        string file = null;
+        if (request.DateStr != null)
         {
-            return e.Message;
+            file = files.FirstOrDefault(x => x.Contains(request.DateStr));
+            if (file == null)
+                throw HttpError.NotFound(request.DateStr);
         }
+        else
+        {
+            file = files.OrderByDescending(x => x).FirstOrDefault();
+            if (file == null)
+                return "";
+        }
+        
+        return System.IO.File.ReadAllText(file);
     }
     
     public object Get(GetHealth<GetHealthResponse> request)
@@ -70,6 +63,7 @@ public class CommonService : Service
             // Potential Statuses: Disposed, Stopped, Stopping, Starting, Started
             RabbitMqState = mqServer.GetStatus()
         };
+        
         return _lastHealthCheck;
     }
     private static DateTimeOffset _lastHealthCheckTime;
@@ -77,6 +71,6 @@ public class CommonService : Service
 
     public object Get(GetVersion request)
     {
-        return typeof(CommonService).Assembly.GetName().Version;
+        return new HttpResult(typeof(CommonService).Assembly.GetName().Version);
     }
 }
