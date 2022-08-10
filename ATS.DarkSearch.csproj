@@ -2,38 +2,16 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <PackageVersion>0.5.4</PackageVersion>
+    <PackageVersion>0.5.6</PackageVersion>
     <Title>ATS.DarkSearch</Title>
     <Authors>ATS</Authors>
-    <AssemblyVersion>0.5.4</AssemblyVersion>
-    <FileVersion>0.5.4</FileVersion>
+    <AssemblyVersion>0.5.6</AssemblyVersion>
+    <FileVersion>0.5.6</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Data\links.txt" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Data\links.txt">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <None Remove="Data\ServiceStackLicense.txt" />
-    <Content Include="Data\ServiceStackLicense.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Remove="Data\links_test.txt" />
-    <Content Include="Data\links_test.txt">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <None Remove="Data\links_ransomware.txt" />
-    <Content Include="Data\links_ransomware.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="AngleSharp" Version="0.17.1" />
-    <PackageReference Include="ATS-Common" Version="0.3.20" />
+    <PackageReference Include="ATS-Common" Version="0.4.7" />
     <PackageReference Include="NEST" Version="7.17.0" />
     <PackageReference Include="RabbitMQ.Client" Version="5.2.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="5.0.0" />

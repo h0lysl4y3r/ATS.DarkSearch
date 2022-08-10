@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using Serilog;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
@@ -31,12 +30,8 @@ try
 	}
 
 	app.UseSerilogRequestLogging();
-
-	var licensePath = "~/Data/ServiceStackLicense.txt".MapServerPath();
-	if (!File.Exists(licensePath))
-		Log.Error("License path does not exist: " + licensePath);
-
-	Licensing.RegisterLicenseFromFileIfExists(licensePath);
+	
+	Licensing.RegisterLicense("18238-e1JlZjoxODIzOCxOYW1lOkVMSUEgcy5yLm8uLFR5cGU6SW5kaWUsTWV0YTowLEhhc2g6UVI3WUI4UFpYOTlDY1Q0WWQ5bVpiYnQrRUorRG5kUldVVVYrdE1tMlVsWWl3S3pQb010ME4yVW1PR0g0VkFtUktDMW5zOWtYUlFKOFAyVHh3Sm8va0VHWVpVanZsZWZuOFlmeUkwNWFQbDI1QnRrWVBkNjVFcUk5OWhWb0RKSkM0R0dPOS9RZkpyR3JQVTRoT1l3VEhYV1BqdnFlaXl3RlVnd1lqTEQyVmdRPSxFeHBpcnk6MjAyMi0xMC0xM30=");
 	
 	Log.Information("Starting web host");
 	app.Run();

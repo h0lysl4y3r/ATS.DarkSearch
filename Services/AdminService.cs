@@ -333,7 +333,9 @@ public class AdminService : Service
     public object Get(GetPingStats request)
     {
         var pingStats = HostContext.AppHost.Resolve<PingStats>();
-        var now = new DateTimeOffset(request.HourTicks, TimeSpan.Zero);
+        var now = request.HourTicks > 0
+            ? new DateTimeOffset(request.HourTicks, TimeSpan.Zero)
+            : DateTimeOffset.UtcNow;
         var minus24h = now.AddDays(-1);
         var minus72h = now.AddDays(-3);
         
