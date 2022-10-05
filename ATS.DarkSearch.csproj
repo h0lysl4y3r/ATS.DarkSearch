@@ -2,31 +2,36 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <PackageVersion>0.5.6</PackageVersion>
+    <PackageVersion>0.5.7</PackageVersion>
     <Title>ATS.DarkSearch</Title>
     <Authors>ATS</Authors>
-    <AssemblyVersion>0.5.6</AssemblyVersion>
-    <FileVersion>0.5.6</FileVersion>
+    <AssemblyVersion>0.5.7</AssemblyVersion>
+    <FileVersion>0.5.7</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="AngleSharp" Version="0.17.1" />
-    <PackageReference Include="ATS-Common" Version="0.4.7" />
+    <PackageReference Include="ATS-Common" Version="0.5.17" />
     <PackageReference Include="NEST" Version="7.17.0" />
     <PackageReference Include="RabbitMQ.Client" Version="5.2.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="5.0.0" />
-    <PackageReference Include="ServiceStack.Api.OpenApi.Core" Version="6.0.2" />
-    <PackageReference Include="ServiceStack.Core" Version="6.0.2" />
-    <PackageReference Include="ServiceStack.Interfaces.Core" Version="6.0.2" />
-    <PackageReference Include="ServiceStack.OrmLite.Core" Version="6.0.2" />
-    <PackageReference Include="ServiceStack.OrmLite.Sqlite.Data" Version="6.0.2" />
-    <PackageReference Include="ServiceStack.RabbitMq.Core" Version="6.0.2" />
-    <PackageReference Include="ServiceStack.Redis.Core" Version="6.0.2" />
+    <PackageReference Include="ServiceStack.Api.OpenApi.Core" Version="6.3.0" />
+    <PackageReference Include="ServiceStack.Core" Version="6.3.0" />
+    <PackageReference Include="ServiceStack.Interfaces.Core" Version="6.3.0" />
+    <PackageReference Include="ServiceStack.RabbitMq.Core" Version="6.3.0" />
+    <PackageReference Include="ServiceStack.Redis.Core" Version="6.3.0" />
     <PackageReference Include="SharpCompress" Version="0.31.0" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Logs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ats-elasticsearch.pfx" />
+    <EmbeddedResource Include="ats-elasticsearch.pfx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>
