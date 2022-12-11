@@ -16,7 +16,6 @@ using ATS.Common.Helpers;
 using ATS.Common.Model.DarkSearch;
 using ATS.Common.Poco;
 using ATS.Common.Tor;
-using ATS.DarkSearch.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Net.Http.Headers;
@@ -30,6 +29,12 @@ namespace ATS.DarkSearch.Workers;
 
 public class Spider : TorClient
 {
+    public class Throttle
+    {
+        public int Count { get; set; }
+        public DateTimeOffset? ThrottleDate { get; set; }
+    }
+    
     public class TextContent
     {
         public string Title { get; set; }
@@ -42,7 +47,7 @@ public class Spider : TorClient
     
     public bool IsPaused { get; set; }
     public List<string> Blacklist { get; private set; }
-    public ConcurrentDictionary<string, int> ThrottleMap { get; private set; } = new ConcurrentDictionary<string, int>();
+    public ConcurrentDictionary<string, Throttle> ThrottleMap { get; private set; } = new ConcurrentDictionary<string, Throttle>();
     
     public Spider(Microsoft.Extensions.Configuration.IConfiguration config, 
         IWebHostEnvironment hostEnvironment)
@@ -160,7 +165,7 @@ public class Spider : TorClient
         
         return ping;
     }
-    
+
     private TextContent GetTextContent(string html)
     {
         try
@@ -355,7 +360,7 @@ public class Spider : TorClient
         }
 		
         // Schedule elastic store
-        var accessKey = _config.GetValue<string>("AppSettings:AccessKey");
+        var accessKey = config.GetValue<string>("AppSettings:AccessKey");
 
         Log.Debug($"{nameof(Spider)}:{nameof(Ping)} Scheduling store of " + url);
         mqClient.Publish(new StorePing()
@@ -421,13 +426,13 @@ public class Spider : TorClient
 
     public void PublishPingUpdate(RabbitMqQueueClient mqClient, string url)
     {
-        Log.Information($"[{nameof(PingService)}:{nameof(PublishPingUpdate)}] Publishing update of " + url);
+        Log.Information($"[{nameof(Spider)}:{nameof(PublishPingUpdate)}] Publishing update of " + url);
         
-        var delayStr = _config.GetValue<string>("AppSettings:RefreshPingIntervalMs");
+        var delayStr = config.GetValue<string>("AppSettings:RefreshPingIntervalMs");
         var delay = long.Parse(delayStr);
-        delay = delay + RandomNumberGenerator.GetInt32(0, 86400000); // plus random 0-1 day
+        delay += RandomNumberGenerator.GetInt32(0, 86400000); // plus random 0-1 day
         
-        var accessKey = _config.GetValue<string>("AppSettings:AccessKey");
+        var accessKey = config.GetValue<string>("AppSettings:AccessKey");
         mqClient.PublishDelayed(new Message<UpdatePing>(
             new UpdatePing()
             {
@@ -469,14 +474,27 @@ public class Spider : TorClient
         return redis.Set(cacheKey, Blacklist.ToList());
     }
 
-    private bool ThrottlePing(string domain)
+    public bool ThrottlePing(string domain)
     {
         if (domain == null)
             throw new ArgumentNullException(nameof(domain));
 
-        if (!ThrottleMap.ContainsKey(domain)) ThrottleMap[domain] = 0;
-        ThrottleMap[domain]++;
+        if (!ThrottleMap.ContainsKey(domain)) ThrottleMap[domain] = new Throttle();
+        ThrottleMap[domain].Count++;
 
-        return ThrottleMap[domain] > 1000;
+        var throttleDomainCooldownMinutes = config.GetValue<int>("AppSettings:ThrottleDomainCooldownMinutes");
+        if (ThrottleMap[domain].ThrottleDate.HasValue
+            && DateTimeOffset.UtcNow > ThrottleMap[domain].ThrottleDate.Value.AddMinutes(throttleDomainCooldownMinutes))
+        {
+            ThrottleMap[domain].Count = 0;
+            ThrottleMap[domain].ThrottleDate = null;
+            Log.Information($"[{nameof(Spider)}:{nameof(ThrottlePing)}] {domain} no more throttled");
+        }
+
+        var throttled = ThrottleMap[domain].Count > config.GetValue<int>("AppSettings:ThrottleDomainThreshold");
+        if (throttled && !ThrottleMap[domain].ThrottleDate.HasValue)
+            ThrottleMap[domain].ThrottleDate = DateTimeOffset.UtcNow;
+
+        return throttled;
     }
 }

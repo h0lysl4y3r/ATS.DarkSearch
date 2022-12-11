@@ -228,7 +228,7 @@ public class AdminService : Service
     }
 
     [RequiresAccessKey]
-    public object Post(PingAll request)
+    public object Post(PingAllByFile request)
     {
         if (request.LinkFileName.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.LinkFileName));
@@ -244,6 +244,47 @@ public class AdminService : Service
             .ToArray();
         if (links.Length == 0)
             throw HttpError.ExpectationFailed(nameof(request.LinkFileName));
+
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
+        var mqServer = HostContext.AppHost.Resolve<IMessageService>();
+        using var mqClient = mqServer.CreateMessageQueueClient();
+
+        var config = Request.Resolve<IConfiguration>();
+        foreach (var link in links)
+        {
+            if (!request.PingOnExists)
+            {            
+                var existingPing = repo.Get(link);
+                if (existingPing != null)
+                {
+                    Log.Debug($"[{nameof(AdminService)}:{nameof(PingAllByFile)}] Skipping, ping of " + link + " exists");
+                    continue;
+                }
+            }
+            
+            Log.Information($"[{nameof(AdminService)}:{nameof(PingAllByFile)}] Scheduling ping of " + link);
+            mqClient.Publish(new Ping()
+            {
+                Url = link,
+                AccessKey = config.GetValue<string>("AppSettings:AccessKey")
+            });
+        }
+
+        return new HttpResult();
+    }
+
+    [RequiresAccessKey]
+    public object Post(PingAll request)
+    {
+        if (request.Urls == null || request.Urls.Length == 0)
+            throw HttpError.BadRequest(nameof(request.Urls));
+
+        var links = request.Urls
+            .Select(x => UriHelpers.GetUriSafe(x)?.ToString())
+            .Where(x => x != null)
+            .ToArray();
+        if (links.Length == 0)
+            throw HttpError.ExpectationFailed(nameof(request.Urls));
 
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
         var mqServer = HostContext.AppHost.Resolve<IMessageService>();
@@ -368,6 +409,20 @@ public class AdminService : Service
     {
         var spider = HostContext.AppHost.Resolve<Spider>();
         return new HttpResult(spider.ThrottleMap.Keys.ToList());
+    }
+
+    [RequiresAccessKey]
+    public object Delete(ClearThrottled request)
+    {
+        var spider = Request.Resolve<Spider>();
+        if (request.Domain != null)
+        {
+            var result = spider.ThrottleMap.Remove(request.Domain, out _);
+            return new HttpResult(result);
+        }
+        
+        spider.ThrottleMap.Clear();
+        return new HttpResult();
     }
 
     [RequiresAccessKey]
