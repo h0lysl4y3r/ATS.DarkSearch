@@ -19,7 +19,7 @@ public class SearchService : Service
         
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
         var pings = repo
-            .Search(request.Text, out var total, request.Page * PingsRepository.DefaultSize);
+            .Search(request.Text, out var total, request.Page * PingsRepository.DefaultSize,  10, request.DateFilter);
        
         return new SearchResponse()
         {

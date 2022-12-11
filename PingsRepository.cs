@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using ATS.Common.Model;
 using ATS.Common.Poco;
 using Nest;
 using ServiceStack;
@@ -19,26 +20,47 @@ public class PingsRepository
         _client = client;
     }
     
-    public IReadOnlyCollection<PingResultPoco> Search(string text, out long total, int from = 0, int size = DefaultSize)
+    public IReadOnlyCollection<PingResultPoco> Search(string text, out long total, int from = 0, int size = DefaultSize, DateFilter dateFilter = DateFilter.Last3Years)
     {
         total = 0;
         
         if (text == null)
             throw new ArgumentNullException(nameof(text));
-        
+
         var response = _client.Search<PingResultPoco>(x => x
-            .From(from)
-            .Size(size)
-            .Query(q => q
-                .MultiMatch(m => m
-                    .Fields(f => f
-                        .Field(f1 => f1.Title)
-                        .Field(f2 => f2.Description)
-                        .Field(f3 => f3.Texts))
-                    .Query(text))));
+                .From(from)
+                .Size(size)
+                .Query(q => q
+                    .DateRange(c => c
+                        .Field(p => p.LastModified)
+                        .GreaterThanOrEquals(GetDateMath(dateFilter))
+                        .LessThanOrEquals(DateMath.Now)
+                        .Format("dd/MM/yyyy")
+                        .TimeZone("+00:00"))
+                    && q.MultiMatch(m => m
+                        .Fields(f => f
+                            .Field(f1 => f1.Title)
+                            .Field(f2 => f2.Description)
+                            .Field(f3 => f3.Texts))
+                        .Query(text))));        
 
         total = response.Total;
         return response.Documents;
+    }
+
+    private DateMath GetDateMath(DateFilter filter)
+    {
+        switch (filter)
+        {
+            case DateFilter.LastYear:
+                return DateMath.Now.Subtract("1y").RoundTo(DateMathTimeUnit.Month);
+            case DateFilter.LastMonth:
+                return DateMath.Now.Subtract("1M").RoundTo(DateMathTimeUnit.Day);
+            case DateFilter.LastWeek:
+                return DateMath.Now.Subtract("7d").RoundTo(DateMathTimeUnit.Hour);
+        }
+
+        return DateMath.Now.Subtract("3y").RoundTo(DateMathTimeUnit.Month);
     }
 
     public string[] GetUrls(string inputScrollId, out string outputScrollId, int maxResults)
