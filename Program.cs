@@ -2,6 +2,8 @@ using System;
 using Serilog;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
+using Serilog.Events;
+using Serilog.Sinks.Logz.Io;
 using ServiceStack;
 
 try
@@ -12,6 +14,13 @@ try
 		.Enrich.FromLogContext()
 		.WriteTo.Console()
 		.WriteTo.Debug()
+		.WriteTo.LogzIo(builder.Configuration["AppSettings:LogzioToken"], "ATS.DarkSearch",
+			new LogzioOptions 
+			{ 
+				RestrictedToMinimumLevel = LogEventLevel.Debug,
+				Period = TimeSpan.FromSeconds(15),
+				LogEventsInBatchLimit = 50
+			})
 		.WriteTo.File(path: "~Logs/log.txt".MapServerPath(), rollingInterval: RollingInterval.Day)
 		.ReadFrom.Configuration(ctx.Configuration)
 	);

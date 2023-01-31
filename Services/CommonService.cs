@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using ATS.Common.Auth;
 using ATS.Common.Model;
-using ATS.Common.Model.DarkSearch;
 using Nest;
 using ServiceStack;
 using ServiceStack.Messaging;
@@ -40,11 +39,12 @@ public class CommonService : Service
         return System.IO.File.ReadAllText(file);
     }
     
-    public object Get(GetHealth<GetHealthResponse> request)
+    [RequiresAccessKey]
+    public object Get(GetStatus request)
     {
         var utcNow = DateTimeOffset.UtcNow;
-        if (_lastHealthCheck != null && (utcNow - _lastHealthCheckTime).TotalSeconds <= 5)
-            return _lastHealthCheck;
+        if (_lastStatus != null && (utcNow - _lastHealthCheckTime).TotalSeconds <= 5)
+            return _lastStatus;
         _lastHealthCheckTime = utcNow;
         
         var client = HostContext.AppHost.Resolve<ElasticClient>();
@@ -56,18 +56,14 @@ public class CommonService : Service
 
         var mqServer = HostContext.AppHost.Resolve<IMessageService>();
 
-        _lastHealthCheck = new GetHealthResponse()
-        {
-            RedisState = redisPing ? "" : "No ping",
-            ElasticState = pingResponse.OriginalException?.Message ?? "",
-            // Potential Statuses: Disposed, Stopped, Stopping, Starting, Started
-            RabbitMqState = mqServer.GetStatus()
-        };
-        
-        return _lastHealthCheck;
+        _lastStatus = $"Redis:{(redisPing ? "OK" : "No ping")}\n"
+                      + $"RabbitMq:{mqServer.GetStatus()}\n"
+                      + $"Elastic:{pingResponse.OriginalException?.Message ?? ""}\n";
+
+        return _lastStatus;
     }
     private static DateTimeOffset _lastHealthCheckTime;
-    private static GetHealthResponse _lastHealthCheck;
+    private static string _lastStatus;
 
     public object Get(GetVersion request)
     {
