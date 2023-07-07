@@ -58,9 +58,9 @@ public class CommonService : Service
 
         _lastStatus = $"Redis:{(redisPing ? "OK" : "No ping")}\n"
                       + $"RabbitMq:{mqServer.GetStatus()}\n"
-                      + $"Elastic:{pingResponse.OriginalException?.Message ?? ""}\n";
+                      + $"Elastic:{pingResponse.OriginalException?.Message ?? "OK"}\n";
 
-        return _lastStatus;
+        return new HttpResult(_lastStatus);
     }
     private static DateTimeOffset _lastHealthCheckTime;
     private static string _lastStatus;

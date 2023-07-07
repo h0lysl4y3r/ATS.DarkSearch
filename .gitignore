@@ -5,7 +5,7 @@
 /.idea
 /Logs
 /Tor
-ATS.DarkSearch.sln.DotSettings.user
+/ATS.DarkSearch.sln.DotSettings.user
 /Data
-appsettings*.json
-ats-elasticsearch.pfx
+/appsettings*.json
+/ats-elasticsearch.pfx

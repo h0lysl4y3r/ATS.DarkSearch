@@ -110,7 +110,13 @@ public class PingsRepository
 
         return urls.ToArray();
     }
-    
+
+    public long Count()
+    {
+        var countRequest = new CountRequest(Indices.Index(PingsIndex));
+        return _client.Count(countRequest)?.Count ?? 0;
+    }
+
     public PingResultPoco Get(string url)
     {
         if (url == null)

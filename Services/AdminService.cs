@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ATS.Common;
 using ATS.Common.Auth;
 using ATS.Common.Extensions;
 using ATS.Common.Helpers;
@@ -21,8 +22,20 @@ using RabbitMqWorker = ATS.DarkSearch.Workers.RabbitMqWorker;
 
 namespace ATS.DarkSearch.Services;
 
+[Route("/admin/pings/count", "GET", Summary = "Get ping index document count.")]
+public class GetPingCount : BaseRequest, IGet, IReturn<long>
+{
+}
+
 public class AdminService : Service
 {
+    [RequiresAccessKey]
+    public object Get(GetPingCount request)
+    {
+        var repo = HostContext.AppHost.Resolve<PingsRepository>();
+        return new HttpResult(repo.Count());
+    }
+
     [RequiresAccessKey]
     public object Post(AddOrRemoveToBlacklist request)
     {
@@ -228,7 +241,7 @@ public class AdminService : Service
     }
 
     [RequiresAccessKey]
-    public object Post(PingAllByFile request)
+    public object Put(PingAllByFile request)
     {
         if (request.LinkFileName.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.LinkFileName));

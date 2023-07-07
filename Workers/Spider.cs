@@ -399,7 +399,7 @@ public class Spider : TorClient
         
         if (!url.Contains(".onion"))
         {
-            Log.Error($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is no onion site");
+            Log.Warning($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is no onion site");
             pingStats.Update(url, PingStats.PingState.Blacklisted);
             return PingStats.PingState.Blacklisted;
         }
