@@ -2,11 +2,11 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <PackageVersion>0.6.6</PackageVersion>
+    <PackageVersion>0.6.7</PackageVersion>
     <Title>ATS.DarkSearch</Title>
     <Authors>ATS</Authors>
-    <AssemblyVersion>0.6.6</AssemblyVersion>
-    <FileVersion>0.6.6</FileVersion>
+    <AssemblyVersion>0.6.7</AssemblyVersion>
+    <FileVersion>0.6.7</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

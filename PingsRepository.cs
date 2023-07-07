@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ATS.Common.Model;
 using ATS.Common.Poco;
+using Microsoft.Extensions.Configuration;
 using Nest;
 using ServiceStack;
 
@@ -14,10 +15,14 @@ public class PingsRepository
     public const int DefaultSize = 10;
 
     private readonly ElasticClient _client;
-    
-    public PingsRepository(ElasticClient client)
+    private readonly List<string> _searchExcludeWords;
+
+    public PingsRepository(ElasticClient client, IConfiguration config)
     {
         _client = client;
+        
+        _searchExcludeWords = config.GetSection("AppSettings:SearchExcludeWords")
+            .Get<List<string>>();
     }
     
     public IReadOnlyCollection<PingResultPoco> Search(string text, out long total, int from = 0, int size = DefaultSize, DateFilter dateFilter = DateFilter.Last3Years)
@@ -26,23 +31,63 @@ public class PingsRepository
         
         if (text == null)
             throw new ArgumentNullException(nameof(text));
+        
+        Func<QueryContainerDescriptor<PingResultPoco>, QueryContainer> query 
+            = (QueryContainerDescriptor<PingResultPoco> selector) =>
+            {
+                QueryContainer container = selector.DateRange(c => c
+                    .Field(p => p.LastModified)
+                    .GreaterThanOrEquals(GetDateMath(dateFilter))
+                    .LessThanOrEquals(DateMath.Now)
+                    .Format("dd/MM/yyyy")
+                    .TimeZone("+00:00"))
+                && selector.MultiMatch(m => m
+                    .Fields(f => f
+                        .Field(f1 => f1.Title, boost: 3)
+                        .Field(f2 => f2.Description, boost: 2)
+                        .Field(f3 => f3.Texts))
+                    .Query(text));
 
+                if (!_searchExcludeWords.Any(x => text!.Contains(x)))
+                {
+                    foreach (var word in _searchExcludeWords)
+                    {
+                        container = container && selector.Bool(b =>
+                            b.MustNot(mn =>
+                                mn.MultiMatch(mm =>
+                                    mm.Fields(f => f
+                                        .Field(f1 => f1.Title, boost: 3)
+                                        .Field(f2 => f2.Description, boost: 2)
+                                        .Field(f3 => f3.Texts))
+                                    .Query(word)
+                                )));
+                    }
+                }
+                
+                return container;
+            };
         var response = _client.Search<PingResultPoco>(x => x
-                .From(from)
-                .Size(size)
-                .Query(q => q
-                    .DateRange(c => c
-                        .Field(p => p.LastModified)
-                        .GreaterThanOrEquals(GetDateMath(dateFilter))
-                        .LessThanOrEquals(DateMath.Now)
-                        .Format("dd/MM/yyyy")
-                        .TimeZone("+00:00"))
-                    && q.MultiMatch(m => m
-                        .Fields(f => f
-                            .Field(f1 => f1.Title)
-                            .Field(f2 => f2.Description)
-                            .Field(f3 => f3.Texts))
-                        .Query(text))));        
+            .From(from)
+            .Size(size)
+            .Query(query));
+
+        // var response = _client.Search<PingResultPoco>(x => x
+        //         .From(from)
+        //         .Size(size)
+        //         .Query(q => q
+        //             .DateRange(c => c
+        //                 .Field(p => p.LastModified)
+        //                 .GreaterThanOrEquals(GetDateMath(dateFilter))
+        //                 .LessThanOrEquals(DateMath.Now)
+        //                 .Format("dd/MM/yyyy")
+        //                 .TimeZone("+00:00"))
+        //             && q.MultiMatch(m => m
+        //                 .Fields(f => f
+        //                     .Field(f1 => f1.Title)
+        //                     .Field(f2 => f2.Description)
+        //                     .Field(f3 => f3.Texts))
+        //                 .Query(text))
+        //             ));        
 
         total = response.Total;
         return response.Documents;

@@ -1,14 +1,11 @@
 using System;
 using System.Net;
-using System.Security.Cryptography.X509Certificates;
-using ATS.Common.Helpers;
 using ATS.Common.Poco;
 using Elasticsearch.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Nest;
 using Serilog;
-using ServiceStack;
 
 [assembly: HostingStartup(typeof(ATS.DarkSearch.ConfigureElastic))]
 
