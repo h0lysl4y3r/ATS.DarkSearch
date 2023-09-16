@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace ATS.DarkSearch;
 
@@ -13,7 +13,8 @@ public class PingStats
         Paused
     }
 
-    private Dictionary<long, Dictionary<PingState, int>> _hourStats = new Dictionary<long, Dictionary<PingState, int>>();
+    private ConcurrentDictionary<long, ConcurrentDictionary<PingState, int>> _hourStats
+        = new ConcurrentDictionary<long, ConcurrentDictionary<PingState, int>>();
 
     public void Update(string url, PingState state)
     {
@@ -25,7 +26,7 @@ public class PingStats
 
         if (!_hourStats.ContainsKey(now.Ticks))
         {
-            _hourStats[now.Ticks] = new Dictionary<PingState, int>
+            _hourStats[now.Ticks] = new ConcurrentDictionary<PingState, int>
             {
                 [PingState.Ok] = 0,
                 [PingState.Blacklisted] = 0,
@@ -33,7 +34,7 @@ public class PingStats
                 [PingState.Paused] = 0
             };
         }
-        
+
         _hourStats[now.Ticks][state]++;
     }
 

@@ -34,7 +34,7 @@ public class Spider : TorClient
         public int Count { get; set; }
         public DateTimeOffset? ThrottleDate { get; set; }
     }
-    
+
     public class TextContent
     {
         public string Title { get; set; }
@@ -44,12 +44,12 @@ public class Spider : TorClient
     }
 
     public const int PingInMessageLimit = 10 * 1000;
-    
+
     public bool IsPaused { get; set; }
     public List<string> Blacklist { get; private set; }
     public ConcurrentDictionary<string, Throttle> ThrottleMap { get; private set; } = new ConcurrentDictionary<string, Throttle>();
-    
-    public Spider(Microsoft.Extensions.Configuration.IConfiguration config, 
+
+    public Spider(Microsoft.Extensions.Configuration.IConfiguration config,
         IWebHostEnvironment hostEnvironment)
         : base(config, hostEnvironment)
     {
@@ -60,11 +60,11 @@ public class Spider : TorClient
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         await base.StartAsync(cancellationToken);
-        
+
         var clientsManager = HostContext.AppHost.Resolve<IRedisClientsManager>();
         using var redis = clientsManager.GetClient();
         var hostEnvironment = HostContext.AppHost.Resolve<IWebHostEnvironment>();
-        
+
         var cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
         List<string> blacklist = null;
         try
@@ -114,10 +114,10 @@ public class Spider : TorClient
             Domain = new Uri(url).DnsSafeHost
         };
         var links = new List<string>();
-        
+
         ping.StatusCode = response.StatusCode;
         var statusCode = (int) ping.StatusCode;
-        
+
         // get content if 2xx result code
         if (statusCode < 300 || statusCode == 304 /* Not modified */)
         {
@@ -140,7 +140,7 @@ public class Spider : TorClient
                 Log.Warning($"{nameof(Spider)}: No HTML content for " + url);
             }
         }
-        
+
         // get location if 3xx result code
         if (statusCode >= 300 && statusCode < 400
                               && response.Headers.TryGetValues(HeaderNames.Location, out var locations))
@@ -149,7 +149,7 @@ public class Spider : TorClient
             {
                 if (!Uri.IsWellFormedUriString(item, UriKind.Absolute))
                     continue;
-                
+
                 links.Add(item);
             }
             ping.IsLive = true;
@@ -162,7 +162,7 @@ public class Spider : TorClient
 
         if (links.Count > 0)
             ping.Links = links.ToArray();
-        
+
         return ping;
     }
 
@@ -196,7 +196,7 @@ public class Spider : TorClient
                     // texts
                     textContent.Texts = bodyTexts;
                 }
-                
+
                 // description
                 if (descriptionElement?.TextContent != null 
                     && descriptionElement.TextContent.Length > 0
@@ -239,7 +239,7 @@ public class Spider : TorClient
                                     || Uri.IsWellFormedUriString(x.Href, UriKind.Absolute)))
                     .Select(x => x.Href)
                     .ToArray();
-                
+
                 return textContent;
             }
         }
@@ -273,7 +273,7 @@ public class Spider : TorClient
     {
         var originalUri = new Uri(originalUrl);
         var result = new List<string>();
-        
+
         for (int i = 0; i < links.Count; i++)
         {
             Uri uri = null;
@@ -281,9 +281,9 @@ public class Spider : TorClient
                 uri = UriHelpers.GetUriSafe($"{originalUri.Scheme}://{originalUri.DnsSafeHost}{links[i]}");
             else
                 uri = UriHelpers.GetUriSafe(UriHelpers.SanitizeUrlScheme(links[i]));
-            
+
             if (uri == null
-                || !uri.TopLevelDomain().Equals("onion", StringComparison.InvariantCultureIgnoreCase))
+                || !uri.SecondLevelDomain().Equals("onion", StringComparison.InvariantCultureIgnoreCase))
             {
                 continue;
             }
@@ -301,7 +301,7 @@ public class Spider : TorClient
             .Select(x => x.Key)
             .ToList();
     }
-    
+
     public async Task<PingResultPoco> Ping(string url)
     {
         if (string.IsNullOrEmpty(url))
@@ -312,18 +312,20 @@ public class Spider : TorClient
 
         var pingStats = HostContext.AppHost.Resolve<PingStats>();
 
+        // check if pinging paused
         if (IsPaused)
         {
             Log.Warning($"{nameof(Spider)}:{nameof(Ping)} paused but calling ping on " + url);
-                
+
             PublishPingUpdate(mqClient, url);
-            
+
             pingStats.Update(url, PingStats.PingState.Paused);
             return null;
         }
-        
+
         Log.Information($"{nameof(Spider)}:{nameof(Ping)} pinging {url}");
 
+        // check if url throttled or blacklisted
         if (IsThrottledOrBlacklisted(url) != PingStats.PingState.Ok)
             return null;
 
@@ -332,7 +334,7 @@ public class Spider : TorClient
             pingStats.Update(url, PingStats.PingState.Paused);
             return null;
         }
-        
+
         pingStats.Update(url, PingStats.PingState.Ok);
 
         // Ping
@@ -358,7 +360,7 @@ public class Spider : TorClient
 
             throw new Exception(message);
         }
-		
+
         // Schedule elastic store
         var accessKey = config.GetValue<string>("AppSettings:AccessKey");
 
@@ -383,7 +385,7 @@ public class Spider : TorClient
                 });
             }
         }
-		
+
         // update ping
         PublishPingUpdate(mqClient, ping.Url);
 
@@ -396,17 +398,19 @@ public class Spider : TorClient
             throw new ArgumentNullException(nameof(url));
 
         var pingStats = HostContext.AppHost.Resolve<PingStats>();
-        
-        if (!url.Contains(".onion"))
+
+        string sanitizedUrl = url.ToLower();
+
+        if (!sanitizedUrl.Contains(".onion"))
         {
             Log.Warning($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is no onion site");
             pingStats.Update(url, PingStats.PingState.Blacklisted);
             return PingStats.PingState.Blacklisted;
         }
 
-        var host = UriHelpers.GetUriSafe(url).DnsSafeHost;
-        var domain = host.Split(new[] {'.'})[0];
-        
+        Uri uri = UriHelpers.GetUriSafe(sanitizedUrl);
+        var domain = uri.SecondLevelDomain();
+
         if (Blacklist.Any(x => x != null && x.Contains(domain)))
         {
             Log.Warning($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is blacklisted");
@@ -427,11 +431,11 @@ public class Spider : TorClient
     public void PublishPingUpdate(RabbitMqQueueClient mqClient, string url)
     {
         Log.Information($"[{nameof(Spider)}:{nameof(PublishPingUpdate)}] Publishing update of " + url);
-        
+
         var delayStr = config.GetValue<string>("AppSettings:RefreshPingIntervalMs");
         var delay = long.Parse(delayStr);
         delay += RandomNumberGenerator.GetInt32(0, 86400000); // plus random 0-1 day
-        
+
         var accessKey = config.GetValue<string>("AppSettings:AccessKey");
         mqClient.PublishDelayed(new Message<UpdatePing>(
             new UpdatePing()
@@ -470,7 +474,7 @@ public class Spider : TorClient
                 return true;
             Blacklist.Remove(domain);
         }
-        
+
         return redis.Set(cacheKey, Blacklist.ToList());
     }
 
@@ -479,7 +483,9 @@ public class Spider : TorClient
         if (domain == null)
             throw new ArgumentNullException(nameof(domain));
 
-        if (!ThrottleMap.ContainsKey(domain)) ThrottleMap[domain] = new Throttle();
+        if (!ThrottleMap.ContainsKey(domain))
+            ThrottleMap[domain] = new Throttle();
+
         ThrottleMap[domain].Count++;
 
         var throttleDomainCooldownMinutes = config.GetValue<int>("AppSettings:ThrottleDomainCooldownMinutes");
@@ -489,6 +495,7 @@ public class Spider : TorClient
             ThrottleMap[domain].Count = 0;
             ThrottleMap[domain].ThrottleDate = null;
             Log.Information($"[{nameof(Spider)}:{nameof(ThrottlePing)}] {domain} no more throttled");
+            return false;
         }
 
         var throttled = ThrottleMap[domain].Count > config.GetValue<int>("AppSettings:ThrottleDomainThreshold");
