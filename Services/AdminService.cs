@@ -42,7 +42,7 @@ public class AdminService : Service
         var spider = HostContext.AppHost.Resolve<Spider>();
         if (!spider.AddOrRemoveToBlacklist(request.Domain, request.Add))
             throw HttpError.ServiceUnavailable(nameof(request.Domain));
-        
+
         return new HttpResult();
     }
 
@@ -51,7 +51,7 @@ public class AdminService : Service
     {
         if (request.MaxResults <= 0)
             throw HttpError.BadRequest(nameof(request.MaxResults));
-        
+
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
         var maxResults = Math.Min(request.MaxResults, 1000);
         var urls = repo.GetUrls(request.InputScrollId, out var outputScrollId, request.MaxResults);
@@ -73,10 +73,10 @@ public class AdminService : Service
             var urls = repo.GetUrls(null, out var outputScrollId, 1000 * 1000 * 1000)
                 .ToList();
             urls.Insert(0, urls.Count.ToString());
-        
+
             File.WriteAllLines(dumpPath, urls);
         });
-        
+
         return new HttpResult(dumpPath);
     }
 
@@ -104,7 +104,7 @@ public class AdminService : Service
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
         if (!repo.Delete(request.Url))
             throw HttpError.ServiceUnavailable("ServiceUnavailable");
-        
+
         return new HttpResult();
     }
 
@@ -127,7 +127,7 @@ public class AdminService : Service
                     throw HttpError.ServiceUnavailable(url);
             }
         }
-        
+
         return new HttpResult();
     }
 
@@ -136,7 +136,7 @@ public class AdminService : Service
     {
         if (request.Domain.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.Domain));
-        
+
         var spider = HostContext.AppHost.Resolve<Spider>();
 
         Task.Run(() =>
@@ -169,7 +169,7 @@ public class AdminService : Service
                     Log.Debug($"[{nameof(AdminService)}:{nameof(ArchivePings)}] archived {count}, looks like no more to archive");
                     break;
                 }
-            
+
                 // no ping to update?
                 mqClient.Ack(message);
                 var ping = message.GetBody();
@@ -187,13 +187,13 @@ public class AdminService : Service
                 }
 
                 // schedule to update if not throttled or blacklisted
-                if (spider.IsThrottledOrBlacklisted(ping.Url) == PingStats.PingState.Ok)
+                if (spider.IsThrottledOrBlacklisted(ping.Url, false, null) == PingStats.PingState.Ok)
                     spider.PublishPingUpdate(mqClient, ping.Url);
             }
 
             Log.Information($"[{nameof(AdminService)}:{nameof(ArchivePings)}] archiving finished");
         });
-        
+
         return new HttpResult();
     }
 
@@ -233,7 +233,7 @@ public class AdminService : Service
         var type = AssemblyHelpers.FindTypeInAllAssembliesByFullName(request.TypeFullName);
         if (type == null)
             throw HttpError.NotFound(nameof(request.TypeFullName));
-        
+
         var mqServer = HostContext.AppHost.Resolve<IMessageService>() as ATSRabbitMqServer;
         var queueNames = new QueueNames(type);
         mqServer.PurgeQueues(queueNames.In, queueNames.Priority, queueNames.Out, queueNames.Dlq);
@@ -250,7 +250,7 @@ public class AdminService : Service
         var filePath = Path.Combine(hostEnvironment.ContentRootPath, "Data", request.LinkFileName);
         if (!File.Exists(filePath))
             throw HttpError.NotFound(nameof(request.LinkFileName));
-            
+
         var links = File.ReadAllLines(filePath)
             .Where(x => x.Trim().Length > 0
                 && !x.Trim().StartsWith("#"))
@@ -266,7 +266,7 @@ public class AdminService : Service
         foreach (var link in links)
         {
             if (!request.PingOnExists)
-            {            
+            {
                 var existingPing = repo.Get(link);
                 if (existingPing != null)
                 {
@@ -274,7 +274,7 @@ public class AdminService : Service
                     continue;
                 }
             }
-            
+
             Log.Information($"[{nameof(AdminService)}:{nameof(PingAllByFile)}] Scheduling ping of " + link);
             mqClient.Publish(new Ping()
             {
@@ -307,7 +307,7 @@ public class AdminService : Service
         foreach (var link in links)
         {
             if (!request.PingOnExists)
-            {            
+            {
                 var existingPing = repo.Get(link);
                 if (existingPing != null)
                 {
@@ -315,7 +315,7 @@ public class AdminService : Service
                     continue;
                 }
             }
-            
+
             Log.Information($"[{nameof(AdminService)}:{nameof(PingAll)}] Scheduling ping of " + link);
             mqClient.Publish(new Ping()
             {
@@ -332,7 +332,7 @@ public class AdminService : Service
     {
         if (request.Url.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.Url));
-        
+
         var spider = HostContext.Resolve<Spider>();
         return new PingSingleResponse()
         {
@@ -345,7 +345,7 @@ public class AdminService : Service
     {
         if (request.Url.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.Url));
-        
+
         var mqServer = HostContext.AppHost.Resolve<IMessageService>();
         using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
 
@@ -361,7 +361,7 @@ public class AdminService : Service
         Republish<Ping>(request.Count);
         return new HttpResult();
     }
-    
+
     [RequiresAccessKey]
     public object Post(RepublishPingsStore request)
     {
@@ -392,7 +392,7 @@ public class AdminService : Service
             : DateTimeOffset.UtcNow;
         var minus24h = now.AddDays(-1);
         var minus72h = now.AddDays(-3);
-        
+
         return new GetPingStatsResponse()
         {
             Ok1h = pingStats.Get(now, PingStats.PingState.Ok),
@@ -409,13 +409,13 @@ public class AdminService : Service
             Paused72h = pingStats.Get(minus72h, PingStats.PingState.Paused),
         };
     }
-    
+
     [RequiresAccessKey]
     public object Get(GetPingStatsBlacklisted request)
     {
         var spider = HostContext.AppHost.Resolve<Spider>();
         return new HttpResult(spider.Blacklist.ToList());
-    }    
+    }
 
     [RequiresAccessKey]
     public object Get(GetPingStatsThrottled request)
@@ -433,7 +433,7 @@ public class AdminService : Service
             var result = spider.ThrottleMap.Remove(request.Domain, out _);
             return new HttpResult(result);
         }
-        
+
         spider.ThrottleMap.Clear();
         return new HttpResult();
     }
@@ -457,7 +457,7 @@ public class AdminService : Service
     {
         if (!AppHostHelpers.UpdateServiceUrl(Request, request.Url, request.ServiceName))
             throw HttpError.ServiceUnavailable($"Failed to update {request.ServiceName}");
-        
+
         return new HttpResult();
     }
 
@@ -478,7 +478,7 @@ public class AdminService : Service
         var uri = UriHelpers.GetUriSafe(request.Url);
         if (uri == null)
             throw HttpError.BadRequest(nameof(request.Url));
-        
+
         return new HttpResult(uri.DnsSafeHost);
     }
 
@@ -488,7 +488,7 @@ public class AdminService : Service
             throw new ArgumentOutOfRangeException(nameof(count));
 
         var config = Request.Resolve<IConfiguration>();
-        
+
         Task.Run(() =>
         {
             var mqServer = HostContext.AppHost.Resolve<IMessageService>();
@@ -499,7 +499,7 @@ public class AdminService : Service
                 IMessage<T> dlqMsg = mqClient.Get<T>(QueueNames<T>.Dlq);
                 if (dlqMsg == null)
                     break;
-            
+
                 mqClient.Ack(dlqMsg);
                 if (delayed)
                 {

@@ -326,7 +326,7 @@ public class Spider : TorClient
         Log.Information($"{nameof(Spider)}:{nameof(Ping)} pinging {url}");
 
         // check if url throttled or blacklisted
-        if (IsThrottledOrBlacklisted(url) != PingStats.PingState.Ok)
+        if (IsThrottledOrBlacklisted(url, true, mqClient) != PingStats.PingState.Ok)
             return null;
 
         if (ATSAppHost.GetBrokerMessageCount(typeof(Ping).FullName, RabbitMqQueueType.In) > PingInMessageLimit)
@@ -392,7 +392,7 @@ public class Spider : TorClient
         return ping;
     }
 
-    public PingStats.PingState IsThrottledOrBlacklisted(string url)
+    public PingStats.PingState IsThrottledOrBlacklisted(string url, bool publishUpdateIfThrottled, RabbitMqQueueClient mqClient)
     {
         if (url == null)
             throw new ArgumentNullException(nameof(url));
@@ -420,6 +420,8 @@ public class Spider : TorClient
 
         if (ThrottlePing(domain))
         {
+            PublishPingUpdate(mqClient, url);
+
             Log.Warning($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is throttled");
             pingStats.Update(url, PingStats.PingState.Throttled);
             return PingStats.PingState.Throttled;
@@ -499,8 +501,11 @@ public class Spider : TorClient
         }
 
         var throttled = ThrottleMap[domain].Count > config.GetValue<int>("AppSettings:ThrottleDomainThreshold");
-        if (throttled && !ThrottleMap[domain].ThrottleDate.HasValue)
-            ThrottleMap[domain].ThrottleDate = DateTimeOffset.UtcNow;
+        if (throttled)
+        {
+            if (!ThrottleMap[domain].ThrottleDate.HasValue)
+                ThrottleMap[domain].ThrottleDate = DateTimeOffset.UtcNow;
+        }
 
         return throttled;
     }
