@@ -9,7 +9,6 @@ try
 	var builder = WebApplication.CreateBuilder(args);
 
 	builder.Host.UseSerilog((ctx, lc) => lc
-    .Filter.ByExcluding(c => c.Properties["RequestPath"].ToString().StartsWith("/swagger-ui"))
 		.Enrich.FromLogContext()
 		.WriteTo.Console()
 		.WriteTo.Debug()

@@ -5,6 +5,7 @@ using ATS.Common.Helpers;
 using Funq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ServiceStack;
 using ServiceStack.Api.OpenApi;
 using ServiceStack.Messaging;
@@ -20,13 +21,18 @@ public class ATSAppHost : AppHostBase, IHostingStartup
     public void Configure(IWebHostBuilder builder) => builder
         .ConfigureServices(services => {
             services.AddSingleton<PingStats>();
+
+            services.AddLogging(builder =>
+            {
+                builder.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.None);
+            });
         })
         .Configure(app => {
             if (!HasInit)
                 app.UseServiceStack(new ATSAppHost());
         });
-    
-    public ATSAppHost() : base("ATS.DarkSearch", typeof(ATSAppHost).Assembly) 
+
+    public ATSAppHost() : base("ATS.DarkSearch", typeof(ATSAppHost).Assembly)
     {
     }
 
@@ -36,7 +42,7 @@ public class ATSAppHost : AppHostBase, IHostingStartup
         Plugins.Add(new OpenApiFeature());
 
         JsConfig.DateHandler = DateHandler.ISO8601;
-        
+
         var hostConfig = new HostConfig
         {
             UseSameSiteCookies = true,
@@ -44,7 +50,7 @@ public class ATSAppHost : AppHostBase, IHostingStartup
             //DefaultRedirectPath = "/ui",
             DefaultRedirectPath = "/swagger-ui",
             DebugMode = true,
-#if DEBUG                
+#if DEBUG
             //AdminAuthSecret = "adm1nSecret", // Enable Admin Access with ?authsecret=adm1nSecret
 #endif
         };
@@ -62,7 +68,7 @@ public class ATSAppHost : AppHostBase, IHostingStartup
     {
         if (typeFullName.IsNullOrEmpty())
             throw new ArgumentNullException(nameof(typeFullName));
-        
+
         var type = AssemblyHelpers.FindTypeInAllAssembliesByFullName(typeFullName);
         if (type == null)
             throw new ArgumentException(nameof(typeFullName));
@@ -95,11 +101,11 @@ public class ATSAppHost : AppHostBase, IHostingStartup
             getFromCache = false;
             _brokerMessageCountLastFetched[queueName] = utcNow;
         }
-        
+
         // try from cache
         if (getFromCache && _brokerMessageCounts.ContainsKey(queueName))
             return _brokerMessageCounts[queueName];
-        
+
         // otherwise request broker
         try
         {

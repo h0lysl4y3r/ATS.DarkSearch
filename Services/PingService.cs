@@ -35,19 +35,26 @@ public class PingService : Service
 		var repo = HostContext.Resolve<PingsRepository>();
 		var ping = repo.Get(request.Ping.Url);
 
+		var ok = false;
 		if (ping != null)
 		{
 			var dateCreated = ping.Date;
 			ping.PopulateWith(request.Ping);
 			ping.Date = dateCreated;
-			repo.Update(ping);
+			ok = repo.Update(ping);
 		}
 		else
 		{
-			repo.Add(request.Ping);
+			ok = repo.Add(request.Ping);
+		}
+
+		if (!ok)
+		{
+			Log.Warning($"[{nameof(PingService)}:{nameof(StorePing)}] Failed to store ping for " + request.Ping.Url);
+			return;
 		}
 	}
-	
+
 	[RequiresAccessKey]
 	public void Any(TryNewPing request)
 	{

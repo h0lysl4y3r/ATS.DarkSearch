@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using ATS.Common.Auth;
 using ATS.Common.Model;
-using Nest;
+using OpenSearch.Client;
 using ServiceStack;
 using ServiceStack.Messaging;
 using ServiceStack.Redis;
@@ -35,10 +35,10 @@ public class CommonService : Service
             if (file == null)
                 return "";
         }
-        
+
         return System.IO.File.ReadAllText(file);
     }
-    
+
     [RequiresAccessKey]
     public object Get(GetStatus request)
     {
@@ -46,8 +46,8 @@ public class CommonService : Service
         if (_lastStatus != null && (utcNow - _lastHealthCheckTime).TotalSeconds <= 5)
             return _lastStatus;
         _lastHealthCheckTime = utcNow;
-        
-        var client = HostContext.AppHost.Resolve<ElasticClient>();
+
+        var client = HostContext.AppHost.Resolve<OpenSearchClient>();
         var pingResponse = client.Ping();
 
         var clientsManager = HostContext.AppHost.Resolve<IRedisClientsManager>();

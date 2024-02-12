@@ -11,7 +11,7 @@ namespace ATS.DarkSearch.Workers;
 
 public class RabbitMqWorker : BackgroundService
 {
-    public const string DelayedMessagesExchange = "mx.servicestack.delayed";
+    public const string DelayedMessagesExchange = "mx.darksearch.delayed";
     private const int LoopDelayMs = 10 * 1000;
     
     private readonly Microsoft.Extensions.Configuration.IConfiguration _config;

@@ -27,7 +27,7 @@ public class ConfigureRabbitMq : IHostingStartup
 
             var rabbitMqUri = new Uri(connectionString);
             Log.Information($"Configuring RabbitMq with {rabbitMqUri.DnsSafeHost}:{rabbitMqUri.Port}");
-            
+
             var mqServer = new ATSRabbitMqServer(RabbitMqWorker.DelayedMessagesExchange,
                 connectionString)
             {
@@ -36,7 +36,7 @@ public class ConfigureRabbitMq : IHostingStartup
                 DisablePriorityQueues = true
             };
             appHost.Register<IMessageService>(mqServer);
-            
+
             mqServer.RegisterHandler<Ping>(appHost.ExecuteMessage, 1);
             mqServer.RegisterHandler<TryNewPing>(appHost.ExecuteMessage, 1);
             mqServer.RegisterHandler<StorePing>(appHost.ExecuteMessage, 1);

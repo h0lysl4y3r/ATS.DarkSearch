@@ -4,7 +4,7 @@ using System.Linq;
 using ATS.Common.Model;
 using ATS.Common.Poco;
 using Microsoft.Extensions.Configuration;
-using Nest;
+using OpenSearch.Client;
 using ServiceStack;
 
 namespace ATS.DarkSearch;
@@ -14,10 +14,10 @@ public class PingsRepository
     public const string PingsIndex = "pings";
     public const int DefaultSize = 10;
 
-    private readonly ElasticClient _client;
+    private readonly OpenSearchClient _client;
     private readonly List<string> _searchExcludeWords;
 
-    public PingsRepository(ElasticClient client, IConfiguration config)
+    public PingsRepository(OpenSearchClient client, IConfiguration config)
     {
         _client = client;
         
