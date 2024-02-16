@@ -16,11 +16,11 @@ public class SearchService : Service
             throw HttpError.BadRequest(nameof(request.Page));
         if (request.Text.IsNullOrEmpty())
             throw HttpError.BadRequest(nameof(request.Text));
-        
+
         var repo = HostContext.AppHost.Resolve<PingsRepository>();
         var pings = repo
             .Search(request.Text, out var total, request.Page * PingsRepository.DefaultSize,  10, request.DateFilter);
-       
+
         return new SearchResponse()
         {
             Total = total,
@@ -29,5 +29,4 @@ public class SearchService : Service
                 .ToArray()
         };
     }
-        
 }

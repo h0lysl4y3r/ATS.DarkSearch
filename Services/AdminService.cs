@@ -74,6 +74,7 @@ public class AdminService : Service
                 .ToList();
             urls.Insert(0, urls.Count.ToString());
 
+            IOHelpers.EnsureDirectory(Path.GetDirectoryName(dumpPath));
             File.WriteAllLines(dumpPath, urls);
         });
 

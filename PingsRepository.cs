@@ -20,19 +20,19 @@ public class PingsRepository
     public PingsRepository(OpenSearchClient client, IConfiguration config)
     {
         _client = client;
-        
+
         _searchExcludeWords = config.GetSection("AppSettings:SearchExcludeWords")
             .Get<List<string>>();
     }
-    
+
     public IReadOnlyCollection<PingResultPoco> Search(string text, out long total, int from = 0, int size = DefaultSize, DateFilter dateFilter = DateFilter.Last3Years)
     {
         total = 0;
-        
+
         if (text == null)
             throw new ArgumentNullException(nameof(text));
-        
-        Func<QueryContainerDescriptor<PingResultPoco>, QueryContainer> query 
+
+        Func<QueryContainerDescriptor<PingResultPoco>, QueryContainer> query
             = (QueryContainerDescriptor<PingResultPoco> selector) =>
             {
                 QueryContainer container = selector.DateRange(c => c
@@ -63,7 +63,7 @@ public class PingsRepository
                                 )));
                     }
                 }
-                
+
                 return container;
             };
         var response = _client.Search<PingResultPoco>(x => x
@@ -87,7 +87,7 @@ public class PingsRepository
         //                     .Field(f2 => f2.Description)
         //                     .Field(f3 => f3.Texts))
         //                 .Query(text))
-        //             ));        
+        //             ));
 
         total = response.Total;
         return response.Documents;
@@ -112,7 +112,7 @@ public class PingsRepository
     {
         if (maxResults <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxResults));
-        
+
         outputScrollId = null;
 
         ISearchResponse<PingResultPoco> response = null;
@@ -124,7 +124,7 @@ public class PingsRepository
         {
             response = _client.Search<PingResultPoco>(s => s
                 .Source(sf => sf
-                    .Includes(i => i 
+                    .Includes(i => i
                         .Fields(
                             f => f.Url
                         )
@@ -133,7 +133,7 @@ public class PingsRepository
                 .Query(q => q
                     .MatchAll()
                 )
-                .Scroll("10s") 
+                .Scroll("10s")
             );
         }
 
@@ -141,7 +141,7 @@ public class PingsRepository
         while (response.Documents.Any())
         {
             outputScrollId = response.ScrollId;
-            
+
             foreach (var document in response.Documents)
             {
                 urls.Add(document.Url);
@@ -178,7 +178,7 @@ public class PingsRepository
 
         return _client.IndexDocument(ping).IsValid;
     }
-    
+
     public bool Update(PingResultPoco ping)
     {
         if (ping == null)
@@ -188,7 +188,7 @@ public class PingsRepository
             ping.Url.ToString(), x => x.Doc(ping))
             .IsValid;
     }
-    
+
     public bool Delete(string url)
     {
         if (url == null)
