@@ -60,7 +60,7 @@ public class PingService : Service
 	{
 		if (request.Url.IsNullOrEmpty())
 			throw HttpError.BadRequest(nameof(request.Url));
-		
+
 		var repo = HostContext.Resolve<PingsRepository>();
 		var ping = repo.Get(request.Url);
 
@@ -94,7 +94,7 @@ public class PingService : Service
 		using var mqClient = mqServer.CreateMessageQueueClient();
 
 		Log.Information($"{nameof(PingService)}:{nameof(UpdatePing)} Update ping of " + url);
-        
+
 		mqClient.Publish(new Ping()
 		{
 			Url = url,

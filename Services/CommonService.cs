@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using ATS.Common.Auth;
 using ATS.Common.Model;
-using OpenSearch.Client;
 using ServiceStack;
 using ServiceStack.Messaging;
 using ServiceStack.Redis;
@@ -47,7 +46,8 @@ public class CommonService : Service
             return _lastStatus;
         _lastHealthCheckTime = utcNow;
 
-        var client = HostContext.AppHost.Resolve<OpenSearchClient>();
+        var clientFactory = HostContext.AppHost.Resolve<OpenSearchClientFactory>();
+        var client = clientFactory.Create();
         var pingResponse = client.Ping();
 
         var clientsManager = HostContext.AppHost.Resolve<IRedisClientsManager>();

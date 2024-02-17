@@ -14,12 +14,12 @@ public class PingsRepository
     public const string PingsIndex = "pings";
     public const int DefaultSize = 10;
 
-    private readonly OpenSearchClient _client;
+    private readonly OpenSearchClientFactory _clientFactory;
     private readonly List<string> _searchExcludeWords;
 
-    public PingsRepository(OpenSearchClient client, IConfiguration config)
+    public PingsRepository(OpenSearchClientFactory clientFactory, IConfiguration config)
     {
-        _client = client;
+        _clientFactory = clientFactory;
 
         _searchExcludeWords = config.GetSection("AppSettings:SearchExcludeWords")
             .Get<List<string>>();
@@ -66,7 +66,9 @@ public class PingsRepository
 
                 return container;
             };
-        var response = _client.Search<PingResultPoco>(x => x
+
+        var client = _clientFactory.Create();
+        var response = client.Search<PingResultPoco>(x => x
             .From(from)
             .Size(size)
             .Query(query));
@@ -115,14 +117,16 @@ public class PingsRepository
 
         outputScrollId = null;
 
+        var client = _clientFactory.Create();
+
         ISearchResponse<PingResultPoco> response = null;
         if (!inputScrollId.IsNullOrEmpty())
         {
-            response = _client.Scroll<PingResultPoco>("10s", inputScrollId);
+            response = client.Scroll<PingResultPoco>("10s", inputScrollId);
         }
         else
         {
-            response = _client.Search<PingResultPoco>(s => s
+            response = client.Search<PingResultPoco>(s => s
                 .Source(sf => sf
                     .Includes(i => i
                         .Fields(
@@ -150,7 +154,7 @@ public class PingsRepository
             if (urls.Count >= maxResults)
                 break;
 
-            response = _client.Scroll<PingResultPoco>("10s", response.ScrollId);
+            response = client.Scroll<PingResultPoco>("10s", response.ScrollId);
         }
 
         return urls.ToArray();
@@ -158,8 +162,10 @@ public class PingsRepository
 
     public long Count()
     {
+        var client = _clientFactory.Create();
+
         var countRequest = new CountRequest(Indices.Index(PingsIndex));
-        return _client.Count(countRequest)?.Count ?? 0;
+        return client.Count(countRequest)?.Count ?? 0;
     }
 
     public PingResultPoco Get(string url)
@@ -167,7 +173,9 @@ public class PingsRepository
         if (url == null)
             throw new ArgumentNullException(nameof(url));
 
-        var response = _client.Get<PingResultPoco>(url);
+        var client = _clientFactory.Create();
+
+        var response = client.Get<PingResultPoco>(url);
         return response.Found ? response.Source : null;
     }
 
@@ -176,7 +184,9 @@ public class PingsRepository
         if (ping == null)
             throw new ArgumentNullException(nameof(ping));
 
-        return _client.IndexDocument(ping).IsValid;
+        var client = _clientFactory.Create();
+
+        return client.IndexDocument(ping).IsValid;
     }
 
     public bool Update(PingResultPoco ping)
@@ -184,7 +194,9 @@ public class PingsRepository
         if (ping == null)
             throw new ArgumentNullException(nameof(ping));
 
-        return _client.Update<PingResultPoco, PingResultPoco>(
+        var client = _clientFactory.Create();
+
+        return client.Update<PingResultPoco, PingResultPoco>(
             ping.Url.ToString(), x => x.Doc(ping))
             .IsValid;
     }
@@ -194,6 +206,8 @@ public class PingsRepository
         if (url == null)
             throw new ArgumentNullException(nameof(url));
 
-        return _client.Delete<PingResultPoco>(url).IsValid;
+        var client = _clientFactory.Create();
+
+        return client.Delete<PingResultPoco>(url).IsValid;
     }
 }

@@ -13,10 +13,10 @@ public class RabbitMqWorker : BackgroundService
 {
     public const string DelayedMessagesExchange = "mx.darksearch.delayed";
     private const int LoopDelayMs = 10 * 1000;
-    
-    private readonly Microsoft.Extensions.Configuration.IConfiguration _config;
-    
-    public RabbitMqWorker(Microsoft.Extensions.Configuration.IConfiguration config)
+
+    private readonly IConfiguration _config;
+
+    public RabbitMqWorker(IConfiguration config)
     {
         _config = config;
     }
