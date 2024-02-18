@@ -15,9 +15,10 @@ public class ConfigureRedis : IHostingStartup
         })
         .ConfigureAppHost(appHost =>
         {
-            Log.Information("Configuring Redis");
+            var connectionString = appHost.AppSettings.GetString("ConnectionStrings:Redis");
+            Log.Information($"Configuring Redis with {connectionString}");
 
-            var clientsManager = new RedisManagerPool(appHost.AppSettings.GetString("ConnectionStrings:Redis"));
+            var clientsManager = new RedisManagerPool(connectionString);
             appHost.Register<IRedisClientsManager>(clientsManager);
         });
 }
