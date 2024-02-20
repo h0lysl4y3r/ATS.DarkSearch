@@ -10,9 +10,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ATS-Common" Version="0.8.7" />
     <PackageReference Include="Knapcode.TorSharp" Version="2.15.0" />
     <PackageReference Include="AngleSharp" Version="1.1.0" />
-    <PackageReference Include="ATS-Common" Version="0.8.5" />
     <PackageReference Include="AWSSDK.SecurityToken" Version="3.7.300.53" />
     <PackageReference Include="OpenSearch.Client" Version="1.6.0" />
     <PackageReference Include="OpenSearch.Net.Auth.AwsSigV4" Version="1.6.0" />
@@ -20,11 +20,11 @@
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.1" />
     <PackageReference Include="Serilog.Sinks.Logz.Io" Version="7.2.0" />
     <PackageReference Include="Serilog.Sinks.Seq" Version="6.0.0" />
-    <PackageReference Include="ServiceStack.Api.OpenApi.Core" Version="8.1.2" />
-    <PackageReference Include="ServiceStack.Core" Version="8.1.2" />
-    <PackageReference Include="ServiceStack.Interfaces.Core" Version="8.1.2" />
-    <PackageReference Include="ServiceStack.RabbitMq.Core" Version="8.1.2" />
-    <PackageReference Include="ServiceStack.Redis.Core" Version="8.1.2" />
+    <PackageReference Include="ServiceStack.Api.OpenApi.Core" Version="6.3.0" />
+    <PackageReference Include="ServiceStack.Core" Version="6.3.0" />
+    <PackageReference Include="ServiceStack.Interfaces.Core" Version="6.3.0" />
+    <PackageReference Include="ServiceStack.RabbitMq.Core" Version="6.3.0" />
+    <PackageReference Include="ServiceStack.Redis.Core" Version="6.3.0" />
     <PackageReference Include="SharpCompress" Version="0.36.0" />
   </ItemGroup>
 
