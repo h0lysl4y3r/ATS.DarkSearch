@@ -41,10 +41,13 @@ public class OpenSearchClientFactory
     {
         if (_credentials == null)
             _credentials = GetCredentialsAsync().GetAwaiter().GetResult();
-
+        else
+            _credentials.GetCredentials();
+        
         var connectionString = _config["ConnectionStrings:Elastic"];
 
         var endpoint = new Uri(connectionString);
+
         var connection = new AwsSigV4HttpConnection(_credentials, RegionEndpoint.EUWest2);
         //var connection = new AwsSigV4HttpConnection(RegionEndpoint.EUWest2);
 
