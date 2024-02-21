@@ -16,7 +16,9 @@ public class OpenSearchClientFactory
 {
     private readonly IConfiguration _config;
     private AssumeRoleAWSCredentials _credentials;
-    private readonly object _lock = new();
+    private readonly object _credentialsLock = new();
+    private DateTime _lastCredentialsUpdate;
+    private readonly TimeSpan _credentialsUpdateInterval = TimeSpan.FromMinutes(15);
 
     public OpenSearchClientFactory(IConfiguration config)
     {
@@ -40,12 +42,14 @@ public class OpenSearchClientFactory
 
     public OpenSearchClient Create()
     {
-        lock (_lock)
+        lock (_credentialsLock)
         {
-            if (_credentials == null)
+            if (_credentials == null
+                || DateTime.UtcNow - _lastCredentialsUpdate >= _credentialsUpdateInterval)
+            {
+                _credentials?.Dispose();
                 _credentials = GetCredentialsAsync().GetAwaiter().GetResult();
-            else
-                _credentials.GetCredentials();
+            }
         }
         
         var connectionString = _config["ConnectionStrings:Elastic"];
@@ -72,6 +76,8 @@ public class OpenSearchClientFactory
 
         var assumeResponse = await stsClient.AssumeRoleAsync(assumeRequest);
 
+        _lastCredentialsUpdate = DateTime.UtcNow;
+        
         return new AssumeRoleAWSCredentials(
             assumeResponse.Credentials,
             _config["AppSettings:RoleArn"],
