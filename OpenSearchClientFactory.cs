@@ -16,6 +16,7 @@ public class OpenSearchClientFactory
 {
     private readonly IConfiguration _config;
     private AssumeRoleAWSCredentials _credentials;
+    private readonly object _lock = new();
 
     public OpenSearchClientFactory(IConfiguration config)
     {
@@ -39,17 +40,19 @@ public class OpenSearchClientFactory
 
     public OpenSearchClient Create()
     {
-        if (_credentials == null)
-            _credentials = GetCredentialsAsync().GetAwaiter().GetResult();
-        else
-            _credentials.GetCredentials();
+        lock (_lock)
+        {
+            if (_credentials == null)
+                _credentials = GetCredentialsAsync().GetAwaiter().GetResult();
+            else
+                _credentials.GetCredentials();
+        }
         
         var connectionString = _config["ConnectionStrings:Elastic"];
 
         var endpoint = new Uri(connectionString);
 
         var connection = new AwsSigV4HttpConnection(_credentials, RegionEndpoint.EUWest2);
-        //var connection = new AwsSigV4HttpConnection(RegionEndpoint.EUWest2);
 
         var config = new ConnectionSettings(endpoint, connection)
             .DefaultIndex(PingsRepository.PingsIndex);
