@@ -157,17 +157,17 @@ public class AdminService : Service
                         IOHelpers.EnsureDirectory($"~/out/archived/{request.Domain}".MapServerPath());
                         var dumpPath = $"~/out/archived/{request.Domain}/{DateTimeOffset.UtcNow.ToString("yyMMdd_hhmmss")}.txt".MapServerPath();
                         File.WriteAllLines(dumpPath, archived);
-                        Log.Debug($"[{nameof(AdminService)}:{nameof(ArchivePings)}] archived " + archived.Count + " into " + dumpPath);
+                        Log.Debug("[{Service}:{Method}] archived {Count} into {DumpPath}", nameof(AdminService), nameof(ArchivePings), archived.Count, dumpPath);
                         archived.Clear();
                     }
                 }
                 count++;
 
                 // no more messages?
-                var message = mqClient.Get<Ping>(QueueNames<Ping>.In);
+                var message = mqClient!.Get<Ping>(QueueNames<Ping>.In);
                 if (message == null)
                 {
-                    Log.Debug($"[{nameof(AdminService)}:{nameof(ArchivePings)}] archived {count}, looks like no more to archive");
+                    Log.Debug("[{Service}:{Method}] archived {Count}, looks like no more to archive", nameof(AdminService), nameof(ArchivePings), count);
                     break;
                 }
 
@@ -192,7 +192,7 @@ public class AdminService : Service
                     spider.PublishPingUpdate(mqClient, ping.Url);
             }
 
-            Log.Information($"[{nameof(AdminService)}:{nameof(ArchivePings)}] archiving finished");
+            Log.Information("[{Service}:{Method}] archiving finished", nameof(AdminService), nameof(ArchivePings));
         });
 
         return new HttpResult();
@@ -237,7 +237,7 @@ public class AdminService : Service
 
         var mqServer = HostContext.AppHost.Resolve<IMessageService>() as ATSRabbitMqServer;
         var queueNames = new QueueNames(type);
-        mqServer.PurgeQueues(queueNames.In, queueNames.Priority, queueNames.Out, queueNames.Dlq);
+        mqServer!.PurgeQueues(queueNames.In, queueNames.Priority, queueNames.Out, queueNames.Dlq);
         return new HttpResult();
     }
 
@@ -271,12 +271,12 @@ public class AdminService : Service
                 var existingPing = repo.Get(link);
                 if (existingPing != null)
                 {
-                    Log.Debug($"[{nameof(AdminService)}:{nameof(PingAllByFile)}] Skipping, ping of " + link + " exists");
+                    Log.Debug("[{Service}:{Method}] Skipping, ping of {Link} exists", nameof(AdminService), nameof(PingAllByFile), link);
                     continue;
                 }
             }
 
-            Log.Information($"[{nameof(AdminService)}:{nameof(PingAllByFile)}] Scheduling ping of " + link);
+            Log.Information("[{Service}:{Method}] Scheduling ping of {Link}", nameof(AdminService), nameof(PingAllByFile), link);
             mqClient.Publish(new Ping()
             {
                 Url = link,
@@ -312,12 +312,12 @@ public class AdminService : Service
                 var existingPing = repo.Get(link);
                 if (existingPing != null)
                 {
-                    Log.Debug($"[{nameof(AdminService)}:{nameof(PingAll)}] Skipping, ping of " + link + " exists");
+                    Log.Debug("[{Service}:{Method}] Skipping, ping of {Link} exists", nameof(AdminService), nameof(PingAll), link);
                     continue;
                 }
             }
 
-            Log.Information($"[{nameof(AdminService)}:{nameof(PingAll)}] Scheduling ping of " + link);
+            Log.Information("[{Service}:{Method}] Scheduling ping of {Link}", nameof(AdminService), nameof(PingAll),  link);
             mqClient.Publish(new Ping()
             {
                 Url = link,
@@ -497,7 +497,7 @@ public class AdminService : Service
 
             for (int i = 0; i < count; i++)
             {
-                IMessage<T> dlqMsg = mqClient.Get<T>(QueueNames<T>.Dlq);
+                IMessage<T> dlqMsg = mqClient!.Get<T>(QueueNames<T>.Dlq);
                 if (dlqMsg == null)
                     break;
 

@@ -2,15 +2,15 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <PackageVersion>0.7.9</PackageVersion>
+    <PackageVersion>0.7.11</PackageVersion>
     <Title>ATS.DarkSearch</Title>
     <Authors>ATS</Authors>
-    <AssemblyVersion>0.7.9</AssemblyVersion>
-    <FileVersion>0.7.9</FileVersion>
+    <AssemblyVersion>0.7.11</AssemblyVersion>
+    <FileVersion>0.7.11</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ATS-Common" Version="0.8.8" />
+    <PackageReference Include="ATS-Common" Version="0.8.9" />
     <PackageReference Include="Knapcode.TorSharp" Version="2.15.0" />
     <PackageReference Include="AngleSharp" Version="1.1.0" />
     <PackageReference Include="AWSSDK.SecurityToken" Version="3.7.300.53" />

@@ -19,7 +19,7 @@ public class PingService : Service
 		var spider = HostContext.Resolve<Spider>();
 		if (spider.IsPaused)
 		{
-			Log.Warning($"[{nameof(PingService)}:{nameof(Ping)}] {nameof(Spider)} is paused when pinging " + request.Url);
+			Log.Warning("[{Service}:{Method}] {Spider} is paused when pinging {Url}", nameof(PingService), nameof(Ping), nameof(Spider), request.Url);
 			return;
 		}
 		
@@ -50,7 +50,7 @@ public class PingService : Service
 
 		if (!ok)
 		{
-			Log.Warning($"[{nameof(PingService)}:{nameof(StorePing)}] Failed to store ping for " + request.Ping.Url);
+			Log.Warning("[{Service}:{Method}] Failed to store ping for {Url}",nameof(PingService), nameof(StorePing), request.Ping.Url);
 			return;
 		}
 	}
@@ -66,7 +66,7 @@ public class PingService : Service
 
 		if (ping != null)
 		{
-			Log.Warning($"[{nameof(PingService)}:{nameof(TryNewPing)}] Ping already stored for " + request.Url);
+			Log.Warning("[{Service}:{Method}] Ping already stored for {Url}", nameof(PingService), nameof(TryNewPing), request.Url);
 			return;
 		}
 
@@ -93,7 +93,7 @@ public class PingService : Service
 		var mqServer = HostContext.Resolve<IMessageService>();
 		using var mqClient = mqServer.CreateMessageQueueClient();
 
-		Log.Information($"{nameof(PingService)}:{nameof(UpdatePing)} Update ping of " + url);
+		Log.Information("{Service}:{Method} Update ping of {Url}", nameof(PingService), nameof(UpdatePing), url);
 
 		mqClient.Publish(new Ping()
 		{

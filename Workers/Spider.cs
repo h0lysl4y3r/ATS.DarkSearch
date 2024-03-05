@@ -80,7 +80,6 @@ public class Spider : TorClient
         }
         catch (Exception ex)
         {
-            Log.Error(ex, ex.Message);
         }
         
         if (!blacklist.IsNullOrEmpty())
@@ -145,7 +144,7 @@ public class Spider : TorClient
             }
             else
             {
-                Log.Warning("{Service}: No HTML content for {Url}", nameof(Spider), url);
+                Log.Warning("[{Service}::{Method}] No HTML content for {Url}", nameof(Spider), nameof(ExecuteAsync), url);
             }
         }
 
@@ -171,6 +170,7 @@ public class Spider : TorClient
 
         if (links.Count > 0)
             ping.Links = links.ToArray();
+        Log.Debug("[{Service}::{Method}] {Count} links found for {Url}", nameof(Spider), nameof(ExecuteAsync), links.Count, url);
 
         return ping;
     }
@@ -291,7 +291,7 @@ public class Spider : TorClient
                 uri = UriHelpers.GetUriSafe(UriHelpers.SanitizeUrlScheme(links[i]));
 
             if (uri == null
-                || !uri.SecondLevelDomain().Equals("onion", StringComparison.InvariantCultureIgnoreCase))
+                || !uri.TopLevelDomain().Equals("onion", StringComparison.InvariantCultureIgnoreCase))
             {
                 continue;
             }
@@ -441,9 +441,8 @@ public class Spider : TorClient
     {
         Log.Information("[{Service}:{Method}] Publishing update of {Url}", nameof(Spider), nameof(PublishPingUpdate), url);
 
-        var delayStr = config.GetValue<string>("AppSettings:RefreshPingIntervalMs");
-        var delay = long.Parse(delayStr);
-        delay += RandomNumberGenerator.GetInt32(0, 86400000); // plus random 0-1 day
+        var delayMs = config.GetValue<int>("AppSettings:RefreshPingIntervalMs");
+        delayMs += RandomNumberGenerator.GetInt32(60 * 1 * 1000, 60 * 60 * 1000); // plus random 1-60 minutes
 
         var accessKey = config.GetValue<string>("AppSettings:AccessKey");
         mqClient.PublishDelayed(new Message<UpdatePing>(
@@ -453,7 +452,7 @@ public class Spider : TorClient
                 AccessKey = accessKey
             })
         {
-            Meta = new Dictionary<string, string>() { { "x-delay", delay.ToString() } }
+            Meta = new Dictionary<string, string>() { { "x-delay", delayMs.ToString() } }
         }, RabbitMqWorker.DelayedMessagesExchange);
     }
 

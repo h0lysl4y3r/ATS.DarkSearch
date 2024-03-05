@@ -21,6 +21,13 @@ public class RabbitMqWorker : BackgroundService
         _config = config;
     }
 
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        Log.Debug("Starting {Service}...", nameof(RabbitMqWorker));
+        
+        return base.StartAsync(cancellationToken);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         // startup delay
