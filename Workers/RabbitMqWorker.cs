@@ -25,7 +25,7 @@ public class RabbitMqWorker : BackgroundService
     {
         // startup delay
         var delay = _config.GetValue<int>($"AppSettings:RabbitMqWorkerStartupDelaySec");
-        Log.Information($"{nameof(RabbitMqWorker)} will start in {delay}s");
+        Log.Information("{Service}:{Method} will start in {Delay}s", nameof(RabbitMqWorker), nameof(ExecuteAsync), delay);
         await Task.Delay(delay * 1000, cancellationToken);
 
         var mqServer = await TaskHelpers.GetAsync<IMessageService>(() => 

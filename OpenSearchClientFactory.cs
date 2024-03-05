@@ -25,7 +25,7 @@ public class OpenSearchClientFactory
         _config = config;
 
         var connectionString = _config["ConnectionStrings:Elastic"];
-        Log.Information($"Configuring Elastic with {connectionString}");
+        Log.Information("Configuring Elastic with {ConnectionString}", connectionString);
 
         var client = Create();
 
@@ -36,7 +36,7 @@ public class OpenSearchClientFactory
                     x => x.AutoMap()
                 ));
             if (response.ServerError != null)
-                Log.Error("Failed to request Elastic with error: " + response.ServerError.Error);
+                Log.Error("Failed to request Elastic with error: {Error}", response.ServerError.Error);
         }
     }
 
@@ -54,7 +54,7 @@ public class OpenSearchClientFactory
         
         var connectionString = _config["ConnectionStrings:Elastic"];
 
-        var endpoint = new Uri(connectionString);
+        var endpoint = new Uri(connectionString!);
 
         var connection = new AwsSigV4HttpConnection(_credentials, RegionEndpoint.EUWest2);
 

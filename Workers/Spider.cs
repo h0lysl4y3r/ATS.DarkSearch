@@ -24,6 +24,8 @@ using ServiceStack;
 using ServiceStack.Messaging;
 using ServiceStack.RabbitMq;
 using ServiceStack.Redis;
+using ArgumentNullException = System.ArgumentNullException;
+using IConfiguration = Microsoft.Extensions.Configuration.IConfiguration;
 
 namespace ATS.DarkSearch.Workers;
 
@@ -47,12 +49,18 @@ public class Spider : TorClient
 
     public bool IsPaused { get; set; }
     public List<string> Blacklist { get; private set; }
-    public ConcurrentDictionary<string, Throttle> ThrottleMap { get; private set; } = new ConcurrentDictionary<string, Throttle>();
+    public ConcurrentDictionary<string, Throttle> ThrottleMap { get; private set; } = new();
 
-    public Spider(Microsoft.Extensions.Configuration.IConfiguration config,
-        IWebHostEnvironment hostEnvironment)
+    private readonly IWebHostEnvironment _hostEnvironment;
+    private readonly IConfiguration _configuration;
+    
+    public Spider(IConfiguration config, IWebHostEnvironment hostEnvironment
+        )
         : base(config, hostEnvironment)
     {
+        _configuration = config ?? throw new ArgumentNullException(nameof(config));
+        _hostEnvironment = hostEnvironment ?? throw new ArgumentNullException(nameof(hostEnvironment));
+        
         Blacklist = config.GetSection("AppSettings:Blacklist")
             .Get<List<string>>();
     }
@@ -63,9 +71,8 @@ public class Spider : TorClient
 
         var clientsManager = HostContext.AppHost.Resolve<IRedisClientsManager>();
         using var redis = clientsManager.GetClient();
-        var hostEnvironment = HostContext.AppHost.Resolve<IWebHostEnvironment>();
 
-        var cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
+        var cacheKey = $"ATS.DarkSearch:{_hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
         List<string> blacklist = null;
         try
         {
@@ -75,9 +82,10 @@ public class Spider : TorClient
         {
             Log.Error(ex, ex.Message);
         }
+        
         if (!blacklist.IsNullOrEmpty())
         {
-            foreach (var item in blacklist)
+            foreach (var item in blacklist!)
             {
                 if (!Blacklist.Contains(item))
                     Blacklist.Add(item);
@@ -97,7 +105,7 @@ public class Spider : TorClient
 
         var response = await SendAsync(request, CancellationToken.None);
         var reason = response.ReasonPhrase ?? "N/A";
-        Log.Information($"[{nameof(Spider)}:{nameof(ExecuteAsync)}] with response {response.StatusCode} ({reason})");
+        Log.Information("[{Service}:{Method}] with response {StatusCode} ({Reason})", nameof(Spider), nameof(ExecuteAsync), response.StatusCode, reason);
 
         // document must be of text/html content-type
         var contentType = response.GetHeaderValueSafe(HeaderNames.ContentType);
@@ -137,13 +145,14 @@ public class Spider : TorClient
             }
             else
             {
-                Log.Warning($"{nameof(Spider)}: No HTML content for " + url);
+                Log.Warning("{Service}: No HTML content for {Url}", nameof(Spider), url);
             }
         }
 
         // get location if 3xx result code
-        if (statusCode >= 300 && statusCode < 400
-                              && response.Headers.TryGetValues(HeaderNames.Location, out var locations))
+        if (statusCode >= 300 
+            && statusCode < 400 
+            && response.Headers.TryGetValues(HeaderNames.Location, out var locations))
         {
             foreach (var item in locations)
             {
@@ -170,84 +179,83 @@ public class Spider : TorClient
     {
         try
         {
-            var config = Configuration.Default.WithDefaultLoader();
-            using (var context = BrowsingContext.New(config))
-            {
-                var parser = context.GetService<IHtmlParser>();
-                var document = parser.ParseDocument(html);
-
-                var textContent = new TextContent();
-
-                var titleElement = document.All
-                    .FirstOrDefault(e => e.LocalName == "title");
-                var descriptionElement = document.All
-                    .FirstOrDefault(e => e.LocalName == "description");
-
-                string[] bodyTexts = null;
-                if (document.Body != null)
-                {
-                    bodyTexts = document.Body
-                        .Children
-                        .Where(e => e.LocalName is "div" or "span" or "p"
-                                    && !e.TextContent.IsNullOrEmpty())
-                        .Select(e => e.TextContent)
-                        .ToArray();
-
-                    // texts
-                    textContent.Texts = bodyTexts;
-                }
-
-                // description
-                if (descriptionElement?.TextContent != null 
-                    && descriptionElement.TextContent.Length > 0
-                    && !descriptionElement.TextContent.Contains("<"))
-                {
-                    textContent.Description = descriptionElement.TextContent;
-                }
-                else if (bodyTexts != null)
-                {
-                    var bodyText = string.Join(" ", bodyTexts);
-                    var wordSplit = Regex.Split(bodyText, @"\W");
-                    var wordSplitSubset = wordSplit.Take(40).ToArray();
-                    textContent.Description = string.Join(" ", wordSplitSubset);
-                }
-                else
-                {
-                    textContent.Description = "";
-                }
-
-                // title
-                if (titleElement?.TextContent != null && titleElement.TextContent.Length > 0)
-                {
-                    textContent.Title = titleElement.TextContent;
-                }
-                else
-                {
-                    textContent.Title = textContent.Description;
-                }
-
-                if (document.Body != null)
-                {
-                }
-
-                // links
-                textContent.Links = document
-                    .Links
-                    .OfType<IHtmlAnchorElement>()
-                    .Where(x => x.Href != null
-                                && (Uri.IsWellFormedUriString(x.Href, UriKind.Relative)
-                                    || Uri.IsWellFormedUriString(x.Href, UriKind.Absolute)))
-                    .Select(x => x.Href)
-                    .ToArray();
-
-                return textContent;
-            }
+            return GetTextContent_Inner(html);
         }
         catch (Exception ex)
         {
             Log.Error(ex, ex.Message);
             return null;
         }
+    }
+
+    private TextContent GetTextContent_Inner(string html)
+    {
+        var browsingContextConfig = Configuration.Default.WithDefaultLoader();
+        using var context = BrowsingContext.New(browsingContextConfig);
+        var parser = context.GetService<IHtmlParser>();
+        var document = parser!.ParseDocument(html);
+
+        var textContent = new TextContent();
+
+        var titleElement = document.All
+            .FirstOrDefault(e => e.LocalName == "title");
+        var descriptionElement = document.All
+            .FirstOrDefault(e => e.LocalName == "description");
+
+        string[] bodyTexts = null;
+        if (document.Body != null)
+        {
+            bodyTexts = document.Body
+                .Children
+                .Where(e => e.LocalName is "div" or "span" or "p"
+                            && !e.TextContent.IsNullOrEmpty())
+                .Select(e => e.TextContent)
+                .ToArray();
+
+            // texts
+            textContent.Texts = bodyTexts;
+        }
+
+        // description
+        if (descriptionElement?.TextContent != null 
+            && descriptionElement.TextContent.Length > 0
+            && !descriptionElement.TextContent.Contains("<"))
+        {
+            textContent.Description = descriptionElement.TextContent;
+        }
+        else if (bodyTexts != null)
+        {
+            var bodyText = string.Join(" ", bodyTexts);
+            var wordSplit = Regex.Split(bodyText, @"\W");
+            var wordSplitSubset = wordSplit.Take(40).ToArray();
+            textContent.Description = string.Join(" ", wordSplitSubset);
+        }
+        else
+        {
+            textContent.Description = "";
+        }
+
+        // title
+        if (titleElement?.TextContent != null && titleElement.TextContent.Length > 0)
+        {
+            textContent.Title = titleElement.TextContent;
+        }
+        else
+        {
+            textContent.Title = textContent.Description;
+        }
+
+        // links
+        textContent.Links = document
+            .Links
+            .OfType<IHtmlAnchorElement>()
+            .Where(x => x.Href != null
+                        && (Uri.IsWellFormedUriString(x.Href, UriKind.Relative)
+                            || Uri.IsWellFormedUriString(x.Href, UriKind.Absolute)))
+            .Select(x => x.Href)
+            .ToArray();
+
+        return textContent;
     }
 
     private string CollapseWhitespace(string text)
@@ -315,7 +323,7 @@ public class Spider : TorClient
         // check if pinging paused
         if (IsPaused)
         {
-            Log.Warning($"{nameof(Spider)}:{nameof(Ping)} paused but calling ping on " + url);
+            Log.Warning("{Service}:{Method} paused but calling ping on {Url}",nameof(Spider), nameof(Ping), url);
 
             PublishPingUpdate(mqClient, url);
 
@@ -323,7 +331,7 @@ public class Spider : TorClient
             return null;
         }
 
-        Log.Information($"{nameof(Spider)}:{nameof(Ping)} pinging {url}");
+        Log.Information("{Service}:{Method} pinging {Url}",nameof(Spider), nameof(Ping), url);
 
         // check if url throttled or blacklisted
         if (IsThrottledOrBlacklisted(url, true, mqClient) != PingStats.PingState.Ok)
@@ -355,17 +363,16 @@ public class Spider : TorClient
         // ping will be null if we tried to read a non-html content
         if (ping == null)
         {
-            var message = $"{nameof(Spider)}:{nameof(Ping)} no ping result on " + url;
-            Log.Error(message);
-
+            Log.Error("{Service}:{Method} no ping result on {Url}", nameof(Spider), nameof(Ping), url);
+            var message = $"{nameof(Spider)}:{nameof(Ping)} no ping result on {url}";
             throw new Exception(message);
         }
 
         // Schedule elastic store
         var accessKey = config.GetValue<string>("AppSettings:AccessKey");
 
-        Log.Debug($"{nameof(Spider)}:{nameof(Ping)} Scheduling store of " + url);
-        mqClient.Publish(new StorePing()
+        Log.Debug("{Service}:{Method} Scheduling store of {Url}", nameof(Spider), nameof(Ping), url);
+        mqClient!.Publish(new StorePing()
         {
             Ping = ping,
             AccessKey = accessKey
@@ -377,7 +384,7 @@ public class Spider : TorClient
             for (int i = 0; i < ping.Links.Length; i++)
             {
                 var link = ping.Links[i];
-                Log.Debug($"{nameof(Spider)}:{nameof(Ping)} Scheduling new ping for " + link);
+                Log.Debug("{Service}:{Method} Scheduling new ping for {Url}", nameof(Spider), nameof(Ping), link);
                 mqClient.Publish(new Ping()
                 {
                     Url = link,
@@ -403,7 +410,7 @@ public class Spider : TorClient
 
         if (!sanitizedUrl.Contains(".onion"))
         {
-            Log.Warning($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is no onion site");
+            Log.Warning("[{Service}:{Method}] {Url} is no onion site", nameof(Spider), nameof(IsThrottledOrBlacklisted), url);
             pingStats.Update(url, PingStats.PingState.Blacklisted);
             return PingStats.PingState.Blacklisted;
         }
@@ -413,7 +420,7 @@ public class Spider : TorClient
 
         if (Blacklist.Any(x => x != null && x.Contains(domain)))
         {
-            Log.Warning($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is blacklisted");
+            Log.Warning("[{Service}:{Method}] {Url} is blacklisted", nameof(Spider), nameof(IsThrottledOrBlacklisted), uri);
             pingStats.Update(url, PingStats.PingState.Blacklisted);
             return PingStats.PingState.Blacklisted;
         }
@@ -422,7 +429,7 @@ public class Spider : TorClient
         {
             PublishPingUpdate(mqClient, url);
 
-            Log.Warning($"[{nameof(Spider)}:{nameof(IsThrottledOrBlacklisted)}] {url} is throttled");
+            Log.Warning("[{Service}:{Method}] {Url} is throttled", nameof(Spider), nameof(IsThrottledOrBlacklisted), url);
             pingStats.Update(url, PingStats.PingState.Throttled);
             return PingStats.PingState.Throttled;
         }
@@ -432,7 +439,7 @@ public class Spider : TorClient
 
     public void PublishPingUpdate(RabbitMqQueueClient mqClient, string url)
     {
-        Log.Information($"[{nameof(Spider)}:{nameof(PublishPingUpdate)}] Publishing update of " + url);
+        Log.Information("[{Service}:{Method}] Publishing update of {Url}", nameof(Spider), nameof(PublishPingUpdate), url);
 
         var delayStr = config.GetValue<string>("AppSettings:RefreshPingIntervalMs");
         var delay = long.Parse(delayStr);
@@ -461,8 +468,7 @@ public class Spider : TorClient
 
         var clientsManager = HostContext.AppHost.Resolve<IRedisClientsManager>();
         using var redis = clientsManager.GetClient();
-        var hostEnvironment = HostContext.AppHost.Resolve<IWebHostEnvironment>();
-        var cacheKey = $"ATS.DarkSearch:{hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
+        var cacheKey = $"ATS.DarkSearch:{_hostEnvironment.EnvironmentName}:{nameof(Spider)}:Blacklist";
 
         if (add)
         {
@@ -477,7 +483,18 @@ public class Spider : TorClient
             Blacklist.Remove(domain);
         }
 
-        return redis.Set(cacheKey, Blacklist.ToList());
+        bool ok = false;
+        try
+        {
+            ok = redis.Set(cacheKey, Blacklist.ToList());
+        }
+        catch (Exception ex)
+        {
+            ok = false;
+            Log.Error(ex, ex.Message);
+        }
+
+        return ok;
     }
 
     public bool ThrottlePing(string domain)
@@ -496,7 +513,7 @@ public class Spider : TorClient
         {
             ThrottleMap[domain].Count = 0;
             ThrottleMap[domain].ThrottleDate = null;
-            Log.Information($"[{nameof(Spider)}:{nameof(ThrottlePing)}] {domain} no more throttled");
+            Log.Information("[{Service}:{Method}] {Domain} no more throttled", nameof(Spider), nameof(ThrottlePing), domain);
             return false;
         }
 

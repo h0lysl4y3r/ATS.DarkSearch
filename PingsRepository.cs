@@ -73,24 +73,6 @@ public class PingsRepository
             .Size(size)
             .Query(query));
 
-        // var response = _client.Search<PingResultPoco>(x => x
-        //         .From(from)
-        //         .Size(size)
-        //         .Query(q => q
-        //             .DateRange(c => c
-        //                 .Field(p => p.LastModified)
-        //                 .GreaterThanOrEquals(GetDateMath(dateFilter))
-        //                 .LessThanOrEquals(DateMath.Now)
-        //                 .Format("dd/MM/yyyy")
-        //                 .TimeZone("+00:00"))
-        //             && q.MultiMatch(m => m
-        //                 .Fields(f => f
-        //                     .Field(f1 => f1.Title)
-        //                     .Field(f2 => f2.Description)
-        //                     .Field(f3 => f3.Texts))
-        //                 .Query(text))
-        //             ));
-
         total = response.Total;
         return response.Documents;
     }

@@ -38,7 +38,6 @@ public class ATSAppHost : AppHostBase, IHostingStartup
 
     public override void Configure(Container container)
     {
-        //Plugins.Add(new AdminUsersFeature());
         Plugins.Add(new OpenApiFeature());
 
         JsConfig.DateHandler = DateHandler.ISO8601;
@@ -47,12 +46,8 @@ public class ATSAppHost : AppHostBase, IHostingStartup
         {
             UseSameSiteCookies = true,
             DefaultContentType = MimeTypes.Json,
-            //DefaultRedirectPath = "/ui",
             DefaultRedirectPath = "/swagger-ui",
             DebugMode = true,
-#if DEBUG
-            //AdminAuthSecret = "adm1nSecret", // Enable Admin Access with ?authsecret=adm1nSecret
-#endif
         };
         SetConfig(hostConfig);
 
@@ -62,8 +57,9 @@ public class ATSAppHost : AppHostBase, IHostingStartup
         });
     }
 
-    private static ConcurrentDictionary<string, uint> _brokerMessageCounts = new ConcurrentDictionary<string, uint>();
-    private static ConcurrentDictionary<string, DateTimeOffset> _brokerMessageCountLastFetched = new ConcurrentDictionary<string, DateTimeOffset>();
+    private static ConcurrentDictionary<string, uint> _brokerMessageCounts = new();
+    private static ConcurrentDictionary<string, DateTimeOffset> _brokerMessageCountLastFetched = new();
+    
     public static uint GetBrokerMessageCount(string typeFullName, RabbitMqQueueType queueType)
     {
         if (typeFullName.IsNullOrEmpty())
@@ -112,7 +108,7 @@ public class ATSAppHost : AppHostBase, IHostingStartup
             var mqServer = HostContext.AppHost.Resolve<IMessageService>();
             using var mqClient = mqServer.CreateMessageQueueClient() as RabbitMqQueueClient;
 
-            var messageCount = mqClient.Channel.QueueDeclarePassive(queueName).MessageCount;
+            var messageCount = mqClient!.Channel.QueueDeclarePassive(queueName).MessageCount;
             _brokerMessageCounts[queueName] = messageCount;
 
             return messageCount;

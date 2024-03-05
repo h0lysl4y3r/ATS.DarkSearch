@@ -13,8 +13,7 @@ public class PingStats
         Paused
     }
 
-    private ConcurrentDictionary<long, ConcurrentDictionary<PingState, int>> _hourStats
-        = new ConcurrentDictionary<long, ConcurrentDictionary<PingState, int>>();
+    private ConcurrentDictionary<long, ConcurrentDictionary<PingState, int>> _hourStats = new();
 
     public void Update(string url, PingState state)
     {
